@@ -15,8 +15,8 @@ package autoid
 
 import (
 	"context"
-	"fmt"
 	"math"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -279,13 +279,13 @@ func (alloc *allocator) Alloc(tableID int64, n uint64) (int64, int64, error) {
 	if alloc.isUnsigned {
 		a, b, err := alloc.alloc4Unsigned(tableID, n)
 		if err != nil {
-			fmt.Println(errors.Trace(err))
+			debug.PrintStack()
 		}
 		return a, b, err
 	}
 	a, b, err := alloc.alloc4Signed(tableID, n)
 	if err != nil {
-		fmt.Println(errors.Trace(err))
+		debug.PrintStack()
 	}
 	return a, b, err
 }
