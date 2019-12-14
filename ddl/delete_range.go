@@ -82,7 +82,7 @@ func newDelRangeManager(store kv.Storage, sessPool *sessionPool) delRangeManager
 
 // addDelRangeJob implements delRangeManager interface.
 func (dr *delRange) addDelRangeJob(job *model.Job) error {
-	ctx, err := dr.sessPool.get()
+	ctx, err := dr.sessPool.get() // 用的 sessionPool 里面的资源去执行 internal sql的
 	if err != nil {
 		return errors.Trace(err)
 	}

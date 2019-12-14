@@ -15,6 +15,7 @@ package autoid
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -276,9 +277,17 @@ func (alloc *allocator) Alloc(tableID int64, n uint64) (int64, int64, error) {
 	alloc.mu.Lock()
 	defer alloc.mu.Unlock()
 	if alloc.isUnsigned {
-		return alloc.alloc4Unsigned(tableID, n)
+		a, b, err := alloc.alloc4Unsigned(tableID, n)
+		if err != nil {
+			fmt.Println(errors.Trace(err))
+		}
+		return a, b, err
 	}
-	return alloc.alloc4Signed(tableID, n)
+	a, b, err := alloc.alloc4Signed(tableID, n)
+	if err != nil {
+		fmt.Println(errors.Trace(err))
+	}
+	return a, b, err
 }
 
 func (alloc *allocator) alloc4Signed(tableID int64, n uint64) (int64, int64, error) {
