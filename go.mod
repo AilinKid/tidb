@@ -7,7 +7,7 @@ require (
 	github.com/coreos/go-systemd v0.0.0-20181031085051-9002847aa142 // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548
-	github.com/cznic/sortutil v0.0.0-20150617083342-4c7342852e65
+	github.com/cznic/sortutil v0.0.0-20181122101858-f5f958428db8
 	github.com/dgryski/go-farm v0.0.0-20190104051053-3adb47b1fb0f
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/go-sql-driver/mysql v0.0.0-20170715192408-3955978caca4
@@ -44,7 +44,6 @@ require (
 	github.com/pingcap/tipb v0.0.0-20191209145133-44f75c9bef33
 	github.com/prometheus/client_golang v1.0.0
 	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
-	github.com/remyoudompheng/bigfft v0.0.0-20190512091148-babf20351dd7 // indirect
 	github.com/shirou/gopsutil v2.19.10+incompatible
 	github.com/shurcooL/httpfs v0.0.0-20171119174359-809beceb2371 // indirect
 	github.com/shurcooL/vfsgen v0.0.0-20181020040650-a97a25d856ca // indirect
@@ -79,4 +78,4 @@ go 1.13
 
 replace github.com/pingcap/check => github.com/tiancaiamao/check v0.0.0-20191119042138-8e73d07b629d
 
-replace github.com/pingcap/parser => github.com/AilinKid/parser v0.0.0-20191217090857-5c68e4ddd854
+replace github.com/pingcap/parser => github.com/AilinKid/parser v0.0.0-20191218053555-4adb113f01c5
