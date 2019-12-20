@@ -636,7 +636,7 @@ func (s *testSerialSuite) TestCanceledJobTakeTime(c *C) {
 		once.Do(func() {
 			err := kv.RunInNewTxn(s.store, false, func(txn kv.Transaction) error {
 				t := meta.NewMeta(txn)
-				return t.DropTableOrView(job.SchemaID, job.TableID, true)
+				return t.DropTableOrView(job.SchemaID, job.TableID, true, job.BinlogInfo.TableInfo.IsSequence())
 			})
 			c.Assert(err, IsNil)
 		})

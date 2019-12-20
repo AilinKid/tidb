@@ -137,6 +137,9 @@ func (p *preprocessor) Enter(in ast.Node) (out ast.Node, skipChildren bool) {
 	case *ast.CreateSequenceStmt:
 		p.flag |= inCreateOrDropTable
 		p.resolveCreateSequenceStmt(node)
+	case *ast.DropSequenceStmt:
+		p.flag |= inCreateOrDropTable
+		p.checkDropSequenceGrammar(node)
 	default:
 		p.flag &= ^parentIsJoin
 	}
@@ -432,9 +435,15 @@ func (p *preprocessor) checkCreateViewGrammar(stmt *ast.CreateViewStmt) {
 		}
 	}
 }
+func (p *preprocessor) checkDropSequenceGrammar(stmt *ast.DropSequenceStmt) {
+	p.checkDropTableName(stmt.Sequences)
+}
 
 func (p *preprocessor) checkDropTableGrammar(stmt *ast.DropTableStmt) {
-	for _, t := range stmt.Tables {
+	p.checkDropTableName(stmt.Tables)
+}
+func (p *preprocessor) checkDropTableName(tables []*ast.TableName) {
+	for _, t := range tables {
 		if isIncorrectName(t.Name.String()) {
 			p.err = ddl.ErrWrongTableName.GenWithStackByArgs(t.Name.String())
 			return

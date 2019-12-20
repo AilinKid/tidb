@@ -341,7 +341,7 @@ func (m *Meta) DropDatabase(dbID int64) error {
 // DropTableOrView drops table in database.
 // If delAutoID is true, it will delete the auto_increment id key-value of the table.
 // For rename table, we do not need to rename auto_increment id key-value.
-func (m *Meta) DropTableOrView(dbID int64, tblID int64, delAutoID bool) error {
+func (m *Meta) DropTableOrView(dbID int64, tblID int64, delAutoID bool, delSequenceID bool) error {
 	// Check if db exists.
 	dbKey := m.dbKey(dbID)
 	if err := m.checkDBExists(dbKey); err != nil {
@@ -359,6 +359,11 @@ func (m *Meta) DropTableOrView(dbID int64, tblID int64, delAutoID bool) error {
 	}
 	if delAutoID {
 		if err := m.txn.HDel(dbKey, m.autoTableIDKey(tblID)); err != nil {
+			return errors.Trace(err)
+		}
+	}
+	if delSequenceID {
+		if err := m.txn.HDel(dbKey, m.sequenceKey(tblID)); err != nil {
 			return errors.Trace(err)
 		}
 	}

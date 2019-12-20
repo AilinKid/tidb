@@ -136,7 +136,7 @@ func onCreateView(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int64, _ error) 
 		tbInfo.State = model.StatePublic
 		tbInfo.UpdateTS = t.StartTS
 		if oldTbInfoID > 0 && orReplace {
-			err = t.DropTableOrView(schemaID, oldTbInfoID, true)
+			err = t.DropTableOrView(schemaID, oldTbInfoID, true, true)
 			if err != nil {
 				return ver, errors.Trace(err)
 			}
@@ -154,6 +154,7 @@ func onCreateView(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int64, _ error) 
 	}
 }
 
+// onDropTableOrView will drop table/view/sequence now.
 func onDropTableOrView(t *meta.Meta, job *model.Job) (ver int64, _ error) {
 	tblInfo, err := checkTableExistAndCancelNonExistJob(t, job, job.SchemaID)
 	if err != nil {
@@ -178,7 +179,7 @@ func onDropTableOrView(t *meta.Meta, job *model.Job) (ver int64, _ error) {
 		if err != nil {
 			return ver, errors.Trace(err)
 		}
-		if err = t.DropTableOrView(job.SchemaID, job.TableID, true); err != nil {
+		if err = t.DropTableOrView(job.SchemaID, job.TableID, true, tblInfo.IsSequence()); err != nil {
 			break
 		}
 		// Finish this job.
@@ -424,7 +425,7 @@ func onTruncateTable(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int64, _ erro
 		return ver, errors.Trace(err)
 	}
 
-	err = t.DropTableOrView(schemaID, tblInfo.ID, true)
+	err = t.DropTableOrView(schemaID, tblInfo.ID, true, tblInfo.IsSequence())
 	if err != nil {
 		job.State = model.JobStateCancelled
 		return ver, errors.Trace(err)
@@ -590,7 +591,7 @@ func onRenameTable(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int64, _ error)
 		tblInfo.OldSchemaID = 0
 	}
 
-	err = t.DropTableOrView(oldSchemaID, tblInfo.ID, shouldDelAutoID)
+	err = t.DropTableOrView(oldSchemaID, tblInfo.ID, shouldDelAutoID, tblInfo.IsSequence())
 	if err != nil {
 		job.State = model.JobStateCancelled
 		return ver, errors.Trace(err)

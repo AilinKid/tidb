@@ -16,6 +16,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"github.com/pingcap/tidb/ddl"
 	"strconv"
 	"strings"
 
@@ -115,6 +116,8 @@ func (e *DDLExec) Next(ctx context.Context, req *chunk.Chunk) (err error) {
 		err = e.executeRepairTable(x)
 	case *ast.CreateSequenceStmt:
 		err = e.executeCreateSequence(x)
+	case *ast.DropSequenceStmt:
+		err = e.executeDropSequence(x)
 
 	}
 	if err != nil {
@@ -520,4 +523,33 @@ func (e *DDLExec) executeRepairTable(s *ast.RepairTableStmt) error {
 
 func (e *DDLExec) executeCreateSequence(s *ast.CreateSequenceStmt) error {
 	return domain.GetDomain(e.ctx).DDL().CreateSequence(e.ctx, s)
+}
+
+func (e *DDLExec) executeDropSequence(s *ast.DropSequenceStmt) error {
+	var notExistTables []string
+	for _, seq := range s.Sequences {
+		ident := ast.Ident{Schema: seq.Schema, Name: seq.Name}
+		_, ok := e.is.SchemaByName(ident.Schema)
+		if !ok {
+			notExistTables = append(notExistTables, ident.String())
+			continue
+		}
+		_, err := e.is.TableByName(ident.Schema, ident.Name)
+		if err != nil && infoschema.ErrTableNotExists.Equal(err) {
+			notExistTables = append(notExistTables, ident.String())
+			continue
+		} else if err != nil {
+			return err
+		}
+		err = domain.GetDomain(e.ctx).DDL().DropSequence(e.ctx, ident)
+		if infoschema.ErrDatabaseNotExists.Equal(err) || infoschema.ErrTableNotExists.Equal(err) {
+			notExistTables = append(notExistTables, ident.String())
+		} else if err != nil {
+			return err
+		}
+	}
+	if len(notExistTables) > 0 && !s.IfExists {
+		return ddl.ErrUnknownSequence.GenWithStackByArgs(strings.Join(notExistTables, ","))
+	}
+	return nil
 }

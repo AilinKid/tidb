@@ -4064,3 +4064,26 @@ func (d *ddl) CreateSequence(ctx sessionctx.Context, stmt *ast.CreateSequenceStm
 	err = d.callHookOnChanged(err)
 	return errors.Trace(err)
 }
+
+func (d *ddl) DropSequence(ctx sessionctx.Context, ti ast.Ident) (err error) {
+	schema, tb, err := d.getSchemaAndTableByIdent(ctx, ti)
+	if err != nil {
+		return errors.Trace(err)
+	}
+
+	if !tb.Meta().IsSequence() {
+		return ErrWrongObject.GenWithStackByArgs(ti.Schema, ti.Name, "SEQUENCE")
+	}
+
+	job := &model.Job{
+		SchemaID:   schema.ID,
+		TableID:    tb.Meta().ID,
+		SchemaName: schema.Name.L,
+		Type:       model.ActionDropSequence,
+		BinlogInfo: &model.HistoryInfo{},
+	}
+
+	err = d.doDDLJob(ctx, job)
+	err = d.callHookOnChanged(err)
+	return errors.Trace(err)
+}
