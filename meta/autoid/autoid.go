@@ -72,6 +72,8 @@ const (
 	AutoIncrementType
 	// AutoRandomType indicates the allocator is used to allocate auto-shard id.
 	AutoRandomType
+	// SequenceType indicates the allocator is used to allocate sequence id.
+	SequenceType
 )
 
 // Allocator is an auto increment id generator.
