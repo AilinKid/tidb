@@ -305,3 +305,15 @@ func init() {
 		pkixTypeNameAttributes[value] = key
 	}
 }
+
+// SequenceSchema is implemented by infoSchema and used by sequence in expression package.
+type SequenceSchema interface {
+	SequenceByName(seqString, defaultDB string) (SequenceTable, error)
+}
+
+// SequenceTable is implemented by tableCommon, and it specialised in handling sequence operation.
+type SequenceTable interface {
+	GetSequenceID() int64
+	GetSequenceNextVal() (int64, error)
+	SetSequenceVal(newVal int64) error
+}

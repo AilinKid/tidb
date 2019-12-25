@@ -28,6 +28,7 @@ import (
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/tablecodec"
 	"github.com/pingcap/tidb/types"
+	"github.com/pingcap/tidb/util"
 	"github.com/pingcap/tidb/util/chunk"
 	"github.com/pingcap/tidb/util/codec"
 	"github.com/pingcap/tidb/util/plancodec"
@@ -53,6 +54,8 @@ var (
 	_ functionClass = &tidbIsDDLOwnerFunctionClass{}
 	_ functionClass = &tidbDecodePlanFunctionClass{}
 	_ functionClass = &tidbDecodeKeyFunctionClass{}
+	_ functionClass = &nextValFunctionClass{}
+	_ functionClass = &lastValFunctionClass{}
 )
 
 var (
@@ -67,6 +70,8 @@ var (
 	_ builtinFunc = &builtinTiDBVersionSig{}
 	_ builtinFunc = &builtinRowCountSig{}
 	_ builtinFunc = &builtinTiDBDecodeKeySig{}
+	_ builtinFunc = &builtinNextValSig{}
+	_ builtinFunc = &builtinLastValSig{}
 )
 
 type databaseFunctionClass struct {
@@ -710,4 +715,87 @@ func (b *builtinTiDBDecodePlanSig) evalString(row chunk.Row) (string, bool, erro
 	}
 	planTree, err := plancodec.DecodePlan(planString)
 	return planTree, false, err
+}
+
+type nextValFunctionClass struct {
+	baseFunctionClass
+}
+
+func (c *nextValFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
+	if err := c.verifyArgs(args); err != nil {
+		return nil, err
+	}
+	bf := newBaseBuiltinFuncWithTp(ctx, args, types.ETInt, types.ETString)
+	sig := &builtinNextValSig{bf}
+	bf.tp.Flen = 10
+	return sig, nil
+}
+
+type builtinNextValSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinNextValSig) Clone() builtinFunc {
+	newSig := &builtinNextValSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinNextValSig) evalInt(row chunk.Row) (int64, bool, error) {
+	sequenceName, isNull, err := b.args[0].EvalString(b.ctx, row)
+	if isNull || err != nil {
+		return 0, isNull, err
+	}
+	defaultDB := b.ctx.GetSessionVars().CurrentDB
+	// check the tableName valid.
+	sequence, err := b.ctx.GetSessionVars().TxnCtx.InfoSchema.(util.SequenceSchema).SequenceByName(sequenceName, defaultDB)
+	if err != nil {
+		return 0, false, err
+	}
+	nextVal, err := sequence.GetSequenceNextVal()
+	if err != nil {
+		return 0, false, err
+	}
+	// update the sequenceState.
+	b.ctx.GetSessionVars().SequenceState.UpdateState(sequence.GetSequenceID(), nextVal)
+	return nextVal, false, nil
+}
+
+type lastValFunctionClass struct {
+	baseFunctionClass
+}
+
+func (c *lastValFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
+	if err := c.verifyArgs(args); err != nil {
+		return nil, err
+	}
+	bf := newBaseBuiltinFuncWithTp(ctx, args, types.ETInt, types.ETString)
+	sig := &builtinLastValSig{bf}
+	bf.tp.Flen = 10
+	return sig, nil
+}
+
+type builtinLastValSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinLastValSig) Clone() builtinFunc {
+	newSig := &builtinLastValSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinLastValSig) evalInt(row chunk.Row) (int64, bool, error) {
+	sequenceName, isNull, err := b.args[0].EvalString(b.ctx, row)
+	if isNull || err != nil {
+		return 0, isNull, err
+	}
+	// check the sequence valid.
+	defaultDB := b.ctx.GetSessionVars().CurrentDB
+	// check the tableName valid.
+	sequence, err := b.ctx.GetSessionVars().TxnCtx.InfoSchema.(util.SequenceSchema).SequenceByName(sequenceName, defaultDB)
+	if err != nil {
+		return 0, false, err
+	}
+	return b.ctx.GetSessionVars().SequenceState.GetLastValue(sequence.GetSequenceID())
 }

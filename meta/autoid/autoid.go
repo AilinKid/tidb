@@ -115,6 +115,8 @@ type allocator struct {
 	lastAllocTime time.Time
 	step          int64
 	allocType     AllocatorType
+	// sequence increment direction, true means positive.
+	direction bool
 }
 
 // GetStep is only used by tests
@@ -289,6 +291,12 @@ func NextStep(curStep int64, consumeDur time.Duration) int64 {
 
 // NewAllocator returns a new auto increment id generator on the store.
 func NewAllocator(store kv.Storage, dbID int64, isUnsigned bool, allocType AllocatorType) Allocator {
+	/*
+	 * Attention : `isUnsigned` field is always false for SequenceType allocator, and
+	 * sequence allocator need a direction parameter additionally.
+	 * So TiDB here will pass the direction parameter through the `isUnsigned` field,
+	 * rather than add a new parameter in the function signature.
+	 */
 	return &allocator{
 		store:         store,
 		dbID:          dbID,
@@ -296,6 +304,8 @@ func NewAllocator(store kv.Storage, dbID int64, isUnsigned bool, allocType Alloc
 		step:          step,
 		lastAllocTime: time.Now(),
 		allocType:     allocType,
+		// Other allocators' direction is always positive.
+		direction: true,
 	}
 }
 
@@ -306,6 +316,9 @@ func NewAllocatorsFromTblInfo(store kv.Storage, schemaID int64, tblInfo *model.T
 	allocs = append(allocs, NewAllocator(store, dbID, tblInfo.IsAutoIncColUnsigned(), RowIDAllocType))
 	if tblInfo.ContainsAutoRandomBits() {
 		allocs = append(allocs, NewAllocator(store, dbID, tblInfo.IsAutoRandomBitColUnsigned(), AutoRandomType))
+	}
+	if tblInfo.IsSequence() {
+		allocs = append(allocs, NewAllocator(store, dbID, false, SequenceType))
 	}
 	return NewAllocators(allocs...)
 }
@@ -442,6 +455,8 @@ func getAutoIDByAllocType(m *meta.Meta, dbID, tableID int64, allocType Allocator
 		return m.GetAutoTableID(dbID, tableID)
 	case AutoRandomType:
 		return m.GetAutoRandomID(dbID, tableID)
+	case SequenceType:
+		return m.GetSequenceID(dbID, tableID)
 	default:
 		return 0, errInvalidAllocatorType.GenWithStackByArgs()
 	}
@@ -453,6 +468,8 @@ func generateAutoIDByAllocType(m *meta.Meta, dbID, tableID, step int64, allocTyp
 		return m.GenAutoTableID(dbID, tableID, step)
 	case AutoRandomType:
 		return m.GenAutoRandomID(dbID, tableID, step)
+	case SequenceType:
+		return m.GenSequenceID(dbID, tableID, step)
 	default:
 		return 0, errInvalidAllocatorType.GenWithStackByArgs()
 	}

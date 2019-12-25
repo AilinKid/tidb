@@ -528,6 +528,10 @@ type SessionVars struct {
 	// and obtain them lazily, and provide a consistent view of inspection tables for each inspection rules.
 	// All cached snapshots will be released at the `InspectionExec` executor closing.
 	InspectionTableCache map[string]TableSnapshot
+
+	// SequenceState cache all sequence's latest value accessed by lastval() builtins. It's a session scoped
+	// variable, and all public methods of SequenceState are currently-safe.
+	SequenceState *SequenceState
 }
 
 // PreparedParams contains the parameters of the current prepared statement when executing it.
@@ -610,6 +614,7 @@ func NewSessionVars() *SessionVars {
 		LockWaitTimeout:             DefInnodbLockWaitTimeout * 1000,
 		MetricSchemaStep:            DefTiDBMetricSchemaStep,
 		MetricSchemaRangeDuration:   DefTiDBMetricSchemaRangeDuration,
+		SequenceState:               NewSequenceState(),
 	}
 	vars.Concurrency = Concurrency{
 		IndexLookupConcurrency:     DefIndexLookupConcurrency,

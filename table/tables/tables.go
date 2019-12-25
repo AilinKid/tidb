@@ -23,6 +23,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/pingcap/errors"
 	"github.com/pingcap/parser/model"
@@ -57,6 +58,7 @@ type TableCommon struct {
 	indices         []table.Index
 	meta            *model.TableInfo
 	allocs          autoid.Allocators
+	sequence        *sequenceCommon
 
 	// recordPrefix and indexPrefix are generated using physicalTableID.
 	recordPrefix kv.Key
@@ -146,6 +148,17 @@ func initTableCommon(t *TableCommon, tblInfo *model.TableInfo, physicalTableID i
 	t.writableIndices = t.WritableIndices()
 	t.recordPrefix = tablecodec.GenTableRecordPrefix(physicalTableID)
 	t.indexPrefix = tablecodec.GenTableIndexPrefix(physicalTableID)
+	if tblInfo.IsSequence() {
+		chanLength := int64(1)
+		if tblInfo.Sequence.Cache {
+			chanLength = tblInfo.Sequence.CacheValue
+		}
+		sequenceChan := make(chan int64, chanLength)
+		t.sequence = &sequenceCommon{meta: tblInfo.Sequence, getChan: sequenceChan, mu: struct {
+			setChan chan<- int64
+			write   sync.Mutex
+		}{setChan: sequenceChan, write: sync.Mutex{}}}
+	}
 }
 
 // initTableIndices initializes the indices of the TableCommon.
@@ -1177,6 +1190,79 @@ func CheckHandleExists(ctx context.Context, sctx sessionctx.Context, t table.Tab
 		return err
 	}
 	return nil
+}
+
+type sequenceCommon struct {
+	meta    *model.SequenceInfo
+	getChan <-chan int64
+	mu      struct {
+		setChan chan<- int64
+		write   sync.Mutex
+	}
+}
+
+// GetSequenceNextVal implements util.SequenceTable GetSequenceNextVal interface.
+func (t *TableCommon) GetSequenceNextVal() (int64, error) {
+	if t.sequence == nil {
+		return 0, errors.New("sequenceCommon is nil")
+	}
+	// Update the cache batch from storage.
+	err := func() error {
+		if len(t.sequence.getChan) == 0 {
+			t.sequence.mu.write.Lock()
+			defer t.sequence.mu.write.Unlock()
+			// Double check whether the chan is empty.
+			if len(t.sequence.getChan) != 0 {
+				return nil
+			}
+			// Batch alloc from kv storage.
+			var sequenceAlloc autoid.Allocator
+			for _, alloc := range t.allocs {
+				if alloc.GetType() == autoid.SequenceType {
+					sequenceAlloc = alloc
+				}
+			}
+			if sequenceAlloc == nil {
+				return errors.New("sequenceAlloc is nil")
+			}
+			/* Calculate next batch size.
+			 * Example: cache 2, increment 2
+			 * batchSize: 2*2
+			 * (min, max] = (n, n+1, n+2, n+3, n+4]
+			 * cause n has been allocated/used in previous sequence get,
+			 * so next val must be n+2 and n+4.
+			 */
+			increment := t.sequence.meta.Increment
+			cacheValue := t.sequence.meta.CacheValue
+			batchSize := increment * cacheValue
+			min, max, err := sequenceAlloc.Alloc(t.tableID, uint64(batchSize))
+			if err != nil {
+				return err
+			}
+			for i := min + increment; i <= max; i += increment {
+				t.sequence.mu.setChan <- i
+			}
+		}
+		return nil
+	}()
+	if err != nil {
+		return 0, err
+	}
+	nextVal := <-t.sequence.getChan
+	if nextVal > t.sequence.meta.MaxValue || nextVal < t.sequence.meta.MinValue {
+		return 0, errors.New("sequence is out of bound")
+	}
+	return nextVal, nil
+}
+
+// SetSequenceVal implements util.SequenceTable SetSequenceVal interface.
+func (t *TableCommon) SetSequenceVal(newVal int64) error {
+	return nil
+}
+
+// GetSequenceID implements util.SequenceTable GetSequenceID interface.
+func (t *TableCommon) GetSequenceID() int64 {
+	return t.tableID
 }
 
 func init() {

@@ -14,8 +14,10 @@
 package infoschema
 
 import (
+	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync/atomic"
 
 	"github.com/pingcap/parser/model"
@@ -281,6 +283,35 @@ func (is *infoSchema) Clone() (result []*model.DBInfo) {
 		result = append(result, v.dbInfo.Clone())
 	}
 	return
+}
+
+func (is *infoSchema) SequenceByName(seqString, defaultDB string) (util.SequenceTable, error) {
+	schema, seq, err := getSchemaAndSequence(seqString)
+	if err != nil {
+		return nil, err
+	}
+	if schema == "" {
+		schema = defaultDB
+	}
+	tbl, err := is.TableByName(model.NewCIStr(schema), model.NewCIStr(seq))
+	if err != nil {
+		return nil, err
+	}
+	if !tbl.Meta().IsSequence() {
+		return nil, err
+	}
+	return tbl.(util.SequenceTable), nil
+}
+
+func getSchemaAndSequence(seq string) (schema string, sequence string, err error) {
+	res := strings.Split(seq, ".")
+	if len(res) > 2 {
+		return "", "", errors.New("nextval args error")
+	}
+	if len(res) == 1 {
+		return "", res[0], nil
+	}
+	return res[0], res[1], nil
 }
 
 // Handle handles information schema, including getting and setting.
