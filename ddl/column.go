@@ -659,6 +659,9 @@ func needChangeColumnData(oldCol, newCol *model.ColumnInfo) bool {
 		newCol.Tp == mysql.TypeEnum || newCol.Tp == mysql.TypeSet {
 		return true
 	}
+	if mysql.IsIntegerType(oldCol.Tp) || !mysql.IsIntegerType(newCol.Tp) {
+		return true
+	}
 	if newCol.Flen > 0 && newCol.Flen < oldCol.Flen || toUnsigned != originUnsigned {
 		return true
 	}

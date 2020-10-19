@@ -288,3 +288,118 @@ func init() {
 	mockTerrorMap[model.StateWriteOnly.String()] = terror.ClassDDL.New(1, "MockRollingBackInCallBack-"+model.StateWriteOnly.String())
 	mockTerrorMap[model.StateWriteReorganization.String()] = terror.ClassDDL.New(1, "MockRollingBackInCallBack-"+model.StateWriteReorganization.String())
 }
+
+func (s *testColumnTypeChangeSuite) TestColumnTypeChangeFromIntegerToString(c *C) {
+	tk := testkit.NewTestKit(c, s.store)
+	tk.MustExec("use test")
+	// Enable column change variable.
+	tk.Se.GetSessionVars().EnableChangeColumnType = true
+	defer func() {
+		tk.Se.GetSessionVars().EnableChangeColumnType = false
+	}()
+
+	prepare := func(tk *testkit.TestKit) {
+		tk.MustExec("drop table if exists t")
+		tk.MustExec("create table t(a tinyint, b smallint, c mediumint, d int, e bigint, f bigint)")
+		tk.MustExec("insert into t values(1, 11, 111, 1111, 11111, 111111)")
+	}
+
+	// integer to string
+	prepare(tk)
+	tk.MustExec("alter table t modify a varchar(10)")
+	modifiedColumn := getModifyColumn(c, tk.Se.(sessionctx.Context), "test", "t", "a", false)
+	c.Assert(modifiedColumn, NotNil)
+	c.Assert(modifiedColumn.Tp, Equals, parser_mysql.TypeVarchar)
+	tk.MustQuery("select a from t").Check(testkit.Rows("1"))
+
+	tk.MustExec("alter table t modify b char(10)")
+	modifiedColumn = getModifyColumn(c, tk.Se.(sessionctx.Context), "test", "t", "b", false)
+	c.Assert(modifiedColumn, NotNil)
+	c.Assert(modifiedColumn.Tp, Equals, parser_mysql.TypeString)
+	tk.MustQuery("select b from t").Check(testkit.Rows("11"))
+
+	tk.MustExec("alter table t modify c binary(10)")
+	modifiedColumn = getModifyColumn(c, tk.Se.(sessionctx.Context), "test", "t", "c", false)
+	c.Assert(modifiedColumn, NotNil)
+	c.Assert(modifiedColumn.Tp, Equals, parser_mysql.TypeString)
+	tk.MustQuery("select c from t").Check(testkit.Rows("111\x00\x00\x00\x00\x00\x00\x00"))
+
+	tk.MustExec("alter table t modify d varbinary(10)")
+	modifiedColumn = getModifyColumn(c, tk.Se.(sessionctx.Context), "test", "t", "d", false)
+	c.Assert(modifiedColumn, NotNil)
+	c.Assert(modifiedColumn.Tp, Equals, parser_mysql.TypeVarchar)
+	tk.MustQuery("select d from t").Check(testkit.Rows("1111"))
+
+	tk.MustExec("alter table t modify e blob(10)")
+	modifiedColumn = getModifyColumn(c, tk.Se.(sessionctx.Context), "test", "t", "e", false)
+	c.Assert(modifiedColumn, NotNil)
+	c.Assert(modifiedColumn.Tp, Equals, parser_mysql.TypeBlob)
+	tk.MustQuery("select e from t").Check(testkit.Rows("11111"))
+
+	tk.MustExec("alter table t modify f text(10)")
+	modifiedColumn = getModifyColumn(c, tk.Se.(sessionctx.Context), "test", "t", "f", false)
+	c.Assert(modifiedColumn, NotNil)
+	c.Assert(modifiedColumn.Tp, Equals, parser_mysql.TypeBlob)
+	tk.MustQuery("select f from t").Check(testkit.Rows("111111"))
+
+	// integer to decimal
+
+}
+
+func (s *testColumnTypeChangeSuite) TestColumnTypeChangeBetweenIntegerFromJsonToOthers(c *C) {
+	tk := testkit.NewTestKit(c, s.store)
+	tk.MustExec("use test")
+	resetJsonTypeColumn(tk)
+
+	// json to json
+	tk.MustExec("alter table t modify c1 json")
+	tk.MustQuery("select * from t").Check(testkit.Rows("{\"a\": 1, \"b\": 2}"))
+
+	// json to integer
+	tk.MustExec("alter table t modify c1 int")
+	tk.MustQuery("select * from t").Check(testkit.Rows("0"))
+
+	// json to decimal
+	resetJsonTypeColumn(tk)
+	tk.MustExec("alter table t modify c1 decimal")
+	tk.MustQuery("select * from t").Check(testkit.Rows("0"))
+
+	// json to time
+	resetJsonTypeColumn(tk)
+	tk.MustExec("alter table t modify c1 time")
+	tk.MustQuery("show warnings").Check(testkit.Rows(""))
+	tk.MustQuery("select * from t").Check(testkit.Rows("00:00:00"))
+
+	// json to timestamp
+	resetJsonTypeColumn(tk)
+	tk.MustExec("alter table t modify c1 time")
+	tk.MustQuery("show warnings").Check(testkit.Rows(""))
+	tk.MustQuery("select * from t").Check(testkit.Rows("0000-00-00 00:00:00"))
+
+	// json to date
+	resetJsonTypeColumn(tk)
+	tk.MustExec("alter table t modify c1 time")
+	tk.MustQuery("show warnings").Check(testkit.Rows(""))
+	tk.MustQuery("select * from t").Check(testkit.Rows("0000-00-00"))
+
+	// json to year
+	resetJsonTypeColumn(tk)
+	tk.MustExec("alter table t modify c1 year")
+	tk.MustQuery("show warnings").Check(testkit.Rows(""))
+	tk.MustQuery("select * from t").Check(testkit.Rows("0000"))
+
+	// json to string
+	// TODO: need change charset from binary to utf8mb4
+	resetJsonTypeColumn(tk)
+	tk.MustExec("alter table t modify c1 varchar(20)")
+	tk.MustQuery("select * from t").Check(testkit.Rows("{\"a\": 1, \"b\": 2}"))
+
+	//
+
+}
+
+func resetJsonTypeColumn(tk *testkit.TestKit) {
+	tk.MustExec("drop table if exists t")
+	tk.MustExec("create table t (c1 json)")
+	tk.MustExec("insert into t values(json_object(\"a\",1,\"b\",2))")
+}
