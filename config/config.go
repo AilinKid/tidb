@@ -459,7 +459,7 @@ var defaultConf = Config{
 		Strategy:     "range",
 	},
 	PessimisticTxn: PessimisticTxn{
-		Enable:        true,
+		Enable:        false,
 		MaxRetryCount: 256,
 	},
 	StmtSummary: StmtSummary{

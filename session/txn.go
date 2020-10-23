@@ -161,6 +161,8 @@ func mockAutoIDRetry() bool {
 	return atomic.LoadInt64(&hasMockAutoIDRetry) == 1
 }
 
+var a int
+
 // Commit overrides the Transaction interface.
 func (st *TxnState) Commit(ctx context.Context) error {
 	defer st.reset()
@@ -191,7 +193,12 @@ func (st *TxnState) Commit(ctx context.Context) error {
 			failpoint.Return(kv.ErrTxnRetryable)
 		}
 	})
-
+	if a == 0 {
+		a++
+		// Let the first query `insert into t select * from s on duplicate key set a = 2` commit fails here, and waits for retry.
+		return kv.ErrTxnRetryable
+	}
+	// For other query, walk through here.
 	return st.Transaction.Commit(ctx)
 }
 

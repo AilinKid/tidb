@@ -351,7 +351,7 @@ const (
 	DefTiDBGeneralLog                  = 0
 	DefTiDBPProfSQLCPU                 = 0
 	DefTiDBRetryLimit                  = 10
-	DefTiDBDisableTxnAutoRetry         = true
+	DefTiDBDisableTxnAutoRetry         = false
 	DefTiDBConstraintCheckInPlace      = false
 	DefTiDBHashJoinConcurrency         = 5
 	DefTiDBProjectionConcurrency       = 4
