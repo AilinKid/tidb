@@ -319,6 +319,29 @@ const (
 		LAST_USED_AT timestamp,
 		PRIMARY KEY(TABLE_ID, INDEX_ID)
 	);`
+
+	// CreateEventTable stores the event information.
+	CreateEventTable = `CREATE TABLE IF NOT EXISTS mysql.async_event (
+		EVENT_ID bigint,
+		EVENT_NAME varchar(64),
+		EVENT_SCHEMA_ID bigint,
+		EVENT_SCHEMA_NAME varchar(64),
+		DEFINER varchar(288),
+		SQL_MODE bigint,
+		TIME_ZONE varchar(64),
+		EVENT_BODY_TYPE varchar(3),
+		EVENT_DEFINITION longtext,
+		INTERVAL_VALUE varchar(256),
+		INTERVAL_UINT bigint,
+		STARTS datetime,
+		ENDS datetime,
+		STATUS enum('ENABLED','DISABLED','SLAVESIDE_DISABLED'),
+		CHARSET varchar(64),
+		COLLATION varchar(64),
+		COMMENT varchar(2048),
+		UNIQUE uni_1 (EVENT_SCHEMA_ID, EVENT_ID),
+		UNIQUE uni_2 (EVENT_SCHEMA_NAME, EVENT_NAME)
+	);`
 )
 
 // bootstrap initiates system DB for a store.
@@ -456,9 +479,11 @@ const (
 	version60 = 60
 	// version61 restore all SQL bindings.
 	version61 = 61
+	// version62 create event physical table.
+	version62 = 62
 
 	// please make sure this is the largest version
-	currentBootstrapVersion = version61
+	currentBootstrapVersion = version62
 )
 
 var (
@@ -524,6 +549,7 @@ var (
 		upgradeToVer59,
 		upgradeToVer60,
 		upgradeToVer61,
+		upgradeToVer62,
 	}
 )
 
@@ -1305,6 +1331,13 @@ func upgradeToVer60(s Session, ver int64) {
 	doReentrantDDL(s, CreateStatsExtended)
 }
 
+func upgradeToVer62(s Session, ver int64) {
+	if ver >= version62 {
+		return
+	}
+	doReentrantDDL(s, CreateEventTable)
+}
+
 type bindInfo struct {
 	bindSQL    string
 	status     string
@@ -1486,6 +1519,8 @@ func doDDLWorks(s Session) {
 	mustExecute(s, CreateStatsExtended)
 	// Create schema_index_usage.
 	mustExecute(s, CreateSchemaIndexUsageTable)
+	// Create event table.
+	mustExecute(s, CreateEventTable)
 }
 
 // doDMLWorks executes DML statements in bootstrap stage.
