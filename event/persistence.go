@@ -16,10 +16,10 @@ package event
 import (
 	"context"
 	"fmt"
+	"github.com/pingcap/parser/ast"
 	"strings"
 
 	"github.com/pingcap/errors"
-	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/auth"
 	"github.com/pingcap/parser/model"
 	"github.com/pingcap/parser/mysql"
@@ -43,35 +43,52 @@ const (
 	// DEFINER           |    varchar(288)
 	// SQL_MODE          |    bigint(20)
 	// TIME_ZONE         |    varchar(64)
-	// EVENT_BODY_TYPE   |    varchar(3)
+	// EVENT_BODY        |    varchar(3)
+	// EVENT_TYPE        |    varchar(9)
 	// EVENT_DEFINITION  |    longtext
+
+	// EXECUTE_AT        |    datetime
+	// STARTS            |    datetime
+	// ENDS              |    datetime
 	// INTERVAL_VALUE    |    varchar(256)
 	// INTERVAL_UINT     |    bigint(20)
 
-	// STARTS            |    datetime
-	// ENDS              |    datetime
 	// STATUS            |    enum('ENABLED','DISABLED','SLAVESIDE_DISABLED')
+	// PRESERVE          |    boolean
+	// ORIGINATOR        |    bigint
+	// INSTANCE          |    varchar(64)
 	// CHARSET           |    varchar(64)
 	// COLLATION         |    varchar(64)
 	// COMMENT           |    varchar(2048)
-	insertEventTableaValue = `("%d", "%s", "%d", "%s",
-		"%s", "%d", "%s", "%s", "%s", "%s", "%d",
-		"%s", "%s", "%s", "%s", "%s", "%s")`
 
-	insertEventTableSQL = insertEventTablePrefix + insertEventTableaValue
+	// NEXT_EXECUTE_AT   |    datetime
+	insertEventTableValue = `(%d, "%s", %d, "%s",
+		"%s", %d, "%s", "%s", "%s", "%s",
+		"%s", "%s", "%s", "%s", "%d",
+		"%s", %t, %d, "%s", "%s", "%s", "%s", "%s")`
+
+	insertEventTableSQL = insertEventTablePrefix + insertEventTableValue
 
 	selectEventTableByIDSQL   = `SELECT * FROM mysql.async_event where event_id = %d and event_schema_id = %d`
 	selectEventTableByNameSQL = `SELECT * FROM mysql.async_event where event_name = "%s" and event_schema_name = "%s"`
+
+	selectEventTableFetchExecutableEvents = `SELECT * FROM mysql.async_event where status="ENABLED" and NEXT_EXECUTE_AT < UTC_TIMESTAMP() limit 1 for update`
 )
 
 // Insert store a eventInfo into physical system table --- event.
-func Insert(e *model2.EventInfo, s sqlexec.SQLExecutor) error {
+func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
+	// compute the next execution time.
+	err := e.ComputeNextExecuteUTCTime(sctx)
+	if err != nil {
+		return err
+	}
 	sql := fmt.Sprintf(insertEventTableSQL, e.EventID, e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
-		e.Definer.String(), e.SQLMode, e.TimeZone, e.Type.String(), e.Statement, e.IntervalValue, e.IntervalUnit,
-		e.Starts.String(), e.Ends.String(), e.Enable.String(), e.Charset, e.Collation, e.Comment)
+		e.Definer.String(), e.SQLMode, e.TimeZone, e.BodyType, e.EventType, e.Statement,
+		e.ExecuteAt.String(), e.Starts.String(), e.Ends.String(), e.IntervalValue, e.IntervalUnit,
+		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.Collation, e.Comment, e.NextExecuteAt)
 
 	logutil.BgLogger().Info("[event] insert into event table", zap.Int64("eventID", e.EventID), zap.String("eventName", e.EventSchemaName.L))
-	_, err := s.Execute(context.Background(), sql)
+	_, err = sctx.(sqlexec.SQLExecutor).Execute(context.Background(), sql)
 	return errors.Trace(err)
 }
 
@@ -142,16 +159,24 @@ func DecodeRowIntoEventInfo(e *model2.EventInfo, r chunk.Row) *model2.EventInfo 
 	e.Definer = &auth.UserIdentity{Username: auths[0], Hostname: auths[1]}
 	e.SQLMode = mysql.SQLMode(r.GetInt64(5))
 	e.TimeZone = r.GetString(6)
-	e.Type = model2.FormEventBodyType(r.GetString(7))
-	e.Statement = r.GetString(8)
-	e.IntervalValue = r.GetString(9)
-	e.IntervalUnit = ast.TimeUnitType(r.GetInt64(10))
+	e.BodyType = r.GetString(7)
+	e.EventType = r.GetString(8)
+	e.Statement = r.GetString(9)
 
+	e.ExecuteAt = r.GetTime(10)
 	e.Starts = r.GetTime(11)
 	e.Ends = r.GetTime(12)
-	e.Enable = model2.FormEventEnableType(r.GetEnum(13).String())
-	e.Charset = r.GetString(14)
-	e.Collation = r.GetString(15)
-	e.Comment = r.GetString(16)
+	e.IntervalValue = r.GetString(13)
+	e.IntervalUnit = ast.TimeUnitType(r.GetInt64(14))
+
+	e.Enable = model2.FormEventEnableType(r.GetEnum(15).String())
+	e.Preserve = r.GetInt64(16) == 1
+	e.Originator = r.GetInt64(17)
+	e.Instance = r.GetString(18)
+	e.Charset = r.GetString(19)
+	e.Collation = r.GetString(20)
+	e.Comment = r.GetString(21)
+
+	e.NextExecuteAt = r.GetTime(22)
 	return e
 }

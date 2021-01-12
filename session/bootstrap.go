@@ -326,19 +326,30 @@ const (
 		EVENT_NAME varchar(64),
 		EVENT_SCHEMA_ID bigint,
 		EVENT_SCHEMA_NAME varchar(64),
+
 		DEFINER varchar(288),
 		SQL_MODE bigint,
 		TIME_ZONE varchar(64),
 		EVENT_BODY_TYPE varchar(3),
+		EVENT_TYPE varchar(9),
 		EVENT_DEFINITION longtext,
-		INTERVAL_VALUE varchar(256),
-		INTERVAL_UINT bigint,
+
+		EXECUTE_AT datetime,
 		STARTS datetime,
 		ENDS datetime,
+		INTERVAL_VALUE varchar(256),
+		INTERVAL_UINT bigint,
+
 		STATUS enum('ENABLED','DISABLED','SLAVESIDE_DISABLED'),
+		PRESERVE boolean,
+		ORIGINATOR bigint,
+		INSTANCE varchar(64),
 		CHARSET varchar(64),
 		COLLATION varchar(64),
 		COMMENT varchar(2048),
+
+        NEXT_EXECUTE_AT datetime,
+
 		UNIQUE uni_1 (EVENT_SCHEMA_ID, EVENT_ID),
 		UNIQUE uni_2 (EVENT_SCHEMA_NAME, EVENT_NAME)
 	);`

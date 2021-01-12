@@ -14,13 +14,15 @@
 package model
 
 import (
-	"fmt"
-
+	"github.com/pingcap/errors"
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/auth"
 	"github.com/pingcap/parser/model"
 	"github.com/pingcap/parser/mysql"
+	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/types"
+	"strconv"
+	"time"
 )
 
 // EventEnableType is used to indicates whether the event is enabled or not.
@@ -53,7 +55,6 @@ func (t EventEnableType) String() string {
 
 // FormEventEnableType form a EventEnableType from a string.
 func FormEventEnableType(s string) EventEnableType {
-	fmt.Println(s == "SLAVESIDE_DISABLED")
 	switch s {
 	case "ENABLED":
 		return TypeEnabled
@@ -67,44 +68,8 @@ func FormEventEnableType(s string) EventEnableType {
 	}
 }
 
-// EventBodyType describes what body type of a event it is.
-type EventBodyType uint8
-
-const (
-	// BodyTypeNone is unknown type.
-	BodyTypeNone EventBodyType = iota
-	// BodyTypeSQL means the event body is SQL.
-	BodyTypeSQL
-	// BodyTypeProcedure means the event body is Procedure.
-	BodyTypeProcedure
-)
-
-func (t EventBodyType) String() string {
-	switch t {
-	case BodyTypeSQL:
-		return "SQL"
-	case BodyTypeProcedure:
-		return "PROCEDURE"
-	default:
-		return "UNKNOWN"
-	}
-}
-
-// FormEventBodyType form a EventBodyType from a string.
-func FormEventBodyType(s string) EventBodyType {
-	switch s {
-	case "SQL":
-		return BodyTypeSQL
-	case "PROCEDURE":
-		return BodyTypeProcedure
-	default:
-		return BodyTypeNone
-
-	}
-}
-
-// TODO: move this part to parser.
 // EventInfo describes what event is like.
+// TODO: move this part to parser.
 type EventInfo struct {
 	EventID         int64
 	EventName       model.CIStr
@@ -115,13 +80,16 @@ type EventInfo struct {
 	// @@sql_mode when the event was created
 	SQLMode mysql.SQLMode
 	// @@time_zone when the event was created
-	TimeZone string
-	Type     EventBodyType
+	TimeZone  string
+	BodyType  string
+	EventType string
 	// the statement to execute
 	Statement string
 	// the statement to display in SHOW CREATE EVENT / SHOW EVENTS, with secret stuff wiped out
 	SecureStmt string
 	Enable     EventEnableType
+	// ExecuteAt Ts in UTC
+	ExecuteAt types.Time
 	// start TS in UTC
 	Starts types.Time
 	// end TS in UTC
@@ -130,7 +98,6 @@ type EventInfo struct {
 	IntervalValue string
 	IntervalUnit  ast.TimeUnitType
 
-	// TODO: where to use the following 3 variables? if necessary, add it in system event table definition.
 	Preserve bool
 	// server ID
 	Originator int64
@@ -140,4 +107,39 @@ type EventInfo struct {
 	Charset   string
 	Collation string
 	Comment   string
+	// Computed next execute time.
+	NextExecuteAt types.Time
+}
+
+// ComputeNextExecuteTime compute the next execution time of this event.
+func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) error {
+	if e.EventType == "ONE TIME" || !e.ExecuteAt.IsZero() {
+		// For one time type event
+		if e.NextExecuteAt.IsZero() {
+			// The event hasn't been executed even once.
+			e.NextExecuteAt = e.ExecuteAt
+		} else {
+			e.Enable = TypeDisabled
+		}
+	} else {
+		if e.NextExecuteAt.IsZero() {
+			e.NextExecuteAt = e.Starts
+		} else {
+			v, err := strconv.Atoi(e.IntervalValue)
+			if err != nil {
+				return errors.Trace(err)
+			}
+			d, err := e.IntervalUnit.Duration()
+			if err != nil {
+				return errors.Trace(err)
+			}
+			duration := time.Duration(v) * d
+			next, err := e.NextExecuteAt.Add(sctx.GetSessionVars().StmtCtx, types.Duration{Duration: duration})
+			if err != nil {
+				return errors.Trace(err)
+			}
+			e.NextExecuteAt = next
+		}
+	}
+	return nil
 }

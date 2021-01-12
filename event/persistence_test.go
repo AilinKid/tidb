@@ -15,7 +15,6 @@ package event_test
 
 import (
 	"context"
-
 	. "github.com/pingcap/check"
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/auth"
@@ -42,20 +41,26 @@ func (s *persistenceSuite) TestEventSystemTable(c *C) {
 		EventSchemaID:   2,
 		EventSchemaName: model.NewCIStr("b"),
 
-		Definer:       &auth.UserIdentity{Username: "root", Hostname: "localhost"},
-		SQLMode:       mysql.ModeStrictAllTables,
-		TimeZone:      "UTC",
-		Type:          model2.FormEventBodyType("SQL"),
-		Statement:     "select * from t",
+		Definer:   &auth.UserIdentity{Username: "root", Hostname: "localhost"},
+		SQLMode:   mysql.ModeStrictAllTables,
+		TimeZone:  "UTC",
+		BodyType:  "SQL",
+		EventType: "ONE TIME",
+		Statement: "select * from t",
+
+		ExecuteAt:     types.CurrentTime(mysql.TypeDatetime),
+		Starts:        types.CurrentTime(mysql.TypeDatetime),
+		Ends:          types.CurrentTime(mysql.TypeDatetime),
 		IntervalValue: "3",
 		IntervalUnit:  ast.TimeUnitHour,
 
-		Starts:    types.CurrentTime(mysql.TypeDatetime),
-		Ends:      types.CurrentTime(mysql.TypeDatetime),
-		Enable:    model2.TypeSlaveSideDisabled,
-		Charset:   "UTF8",
-		Collation: "UTF8MB4",
-		Comment:   "Nothing",
+		Enable:     model2.TypeSlaveSideDisabled,
+		Preserve:   true,
+		Originator: 1,
+		Instance:   "ABC123",
+		Charset:    "UTF8",
+		Collation:  "UTF8MB4",
+		Comment:    "Nothing",
 	}
 	err = event.Insert(e, tk.Se)
 	c.Assert(err, IsNil)
@@ -73,7 +78,8 @@ func (s *persistenceSuite) TestEventSystemTable(c *C) {
 	c.Assert(e.Definer.String(), Equals, e2.Definer.String())
 	c.Assert(e.SQLMode, Equals, e2.SQLMode)
 	c.Assert(e.TimeZone, Equals, e2.TimeZone)
-	c.Assert(e.Type, Equals, e2.Type)
+	c.Assert(e.BodyType, Equals, e2.BodyType)
+	c.Assert(e.EventType, Equals, e2.EventType)
 	c.Assert(e.Statement, Equals, e2.Statement)
 	c.Assert(e.IntervalValue, Equals, e2.IntervalValue)
 	c.Assert(e.IntervalUnit, Equals, e2.IntervalUnit)
@@ -82,6 +88,9 @@ func (s *persistenceSuite) TestEventSystemTable(c *C) {
 	c.Assert(e.Starts.String(), Equals, e2.Starts.String())
 	c.Assert(e.Ends.String(), Equals, e2.Ends.String())
 	c.Assert(e.Enable, Equals, e2.Enable)
+	c.Assert(e.Preserve, Equals, e2.Preserve)
+	c.Assert(e.Originator, Equals, e2.Originator)
+	c.Assert(e.Instance, Equals, e2.Instance)
 	c.Assert(e.Charset, Equals, e2.Charset)
 	c.Assert(e.Collation, Equals, e2.Collation)
 	c.Assert(e.Comment, Equals, e2.Comment)
@@ -97,7 +106,8 @@ func (s *persistenceSuite) TestEventSystemTable(c *C) {
 	c.Assert(e.Definer.String(), Equals, e3.Definer.String())
 	c.Assert(e.SQLMode, Equals, e3.SQLMode)
 	c.Assert(e.TimeZone, Equals, e3.TimeZone)
-	c.Assert(e.Type, Equals, e3.Type)
+	c.Assert(e.BodyType, Equals, e3.BodyType)
+	c.Assert(e.EventType, Equals, e3.EventType)
 	c.Assert(e.Statement, Equals, e3.Statement)
 	c.Assert(e.IntervalValue, Equals, e3.IntervalValue)
 	c.Assert(e.IntervalUnit, Equals, e3.IntervalUnit)
@@ -106,6 +116,9 @@ func (s *persistenceSuite) TestEventSystemTable(c *C) {
 	c.Assert(e.Starts.String(), Equals, e3.Starts.String())
 	c.Assert(e.Ends.String(), Equals, e3.Ends.String())
 	c.Assert(e.Enable, Equals, e3.Enable)
+	c.Assert(e.Preserve, Equals, e2.Preserve)
+	c.Assert(e.Originator, Equals, e2.Originator)
+	c.Assert(e.Instance, Equals, e2.Instance)
 	c.Assert(e.Charset, Equals, e3.Charset)
 	c.Assert(e.Collation, Equals, e3.Collation)
 	c.Assert(e.Comment, Equals, e3.Comment)
