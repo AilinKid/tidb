@@ -62,7 +62,7 @@ const (
 	// COMMENT           |    varchar(2048)
 
 	// NEXT_EXECUTE_AT   |    datetime
-	insertEventTableValue = `(%d, "%s", %d, "%s",
+	insertEventTableValue = `(%s, "%s", %d, "%s",
 		"%s", %d, "%s", "%s", "%s", "%s",
 		"%s", "%s", "%s", "%s", "%d",
 		"%s", %t, %d, "%s", "%s", "%s", "%s", "%s")`
@@ -82,7 +82,7 @@ func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 	if err != nil {
 		return err
 	}
-	sql := fmt.Sprintf(insertEventTableSQL, e.EventID, e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
+	sql := fmt.Sprintf(insertEventTableSQL, "default", e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
 		e.Definer.String(), e.SQLMode, e.TimeZone, e.BodyType, e.EventType, e.Statement,
 		e.ExecuteAt.String(), e.Starts.String(), e.Ends.String(), e.IntervalValue, e.IntervalUnit,
 		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.Collation, e.Comment, e.NextExecuteAt)
@@ -90,6 +90,10 @@ func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 	logutil.BgLogger().Info("[event] insert into event table", zap.Int64("eventID", e.EventID), zap.String("eventName", e.EventSchemaName.L))
 	_, err = sctx.(sqlexec.SQLExecutor).Execute(context.Background(), sql)
 	return errors.Trace(err)
+}
+
+func CheckExist(sctx sessionctx.Context, ident ast.Ident) (*model2.EventInfo, error) {
+	return GetFromName(sctx, ident.Schema.L, ident.Name.L)
 }
 
 // GetFromID fetch a *eventInfo with eventID and eventSchemaID via index.
@@ -110,6 +114,9 @@ func GetFromName(sctx sessionctx.Context, eventName, eventSchemaName string) (*m
 	res, err := getEventInfos(sctx, sql)
 	if err != nil {
 		return nil, err
+	}
+	if len(res) != 1 {
+		return nil, nil
 	}
 	return res[0], nil
 }

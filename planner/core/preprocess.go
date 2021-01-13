@@ -204,6 +204,10 @@ func (p *preprocessor) Enter(in ast.Node) (out ast.Node, skipChildren bool) {
 		p.stmtTp = TypeCreate
 		p.flag |= inCreateOrDropTable
 		p.resolveCreateSequenceStmt(node)
+	case *ast.CreateEventStmt:
+		p.stmtTp = TypeCreate
+		p.flag |= inCreateOrDropTable
+		p.resolveCreateEventStmt(node)
 	case *ast.DropSequenceStmt:
 		p.stmtTp = TypeDrop
 		p.flag |= inCreateOrDropTable
@@ -1250,7 +1254,15 @@ func (p *preprocessor) resolveAlterTableStmt(node *ast.AlterTableStmt) {
 func (p *preprocessor) resolveCreateSequenceStmt(stmt *ast.CreateSequenceStmt) {
 	sName := stmt.Name.Name.String()
 	if isIncorrectName(sName) {
-		p.err = ddl.ErrWrongTableName.GenWithStackByArgs(sName)
+		p.err = errors.Trace(ddl.ErrWrongTableName.GenWithStackByArgs(sName))
+		return
+	}
+}
+
+func (p *preprocessor) resolveCreateEventStmt(stmt *ast.CreateEventStmt) {
+	sName := stmt.EventName.Name.String()
+	if isIncorrectName(sName) {
+		p.err = errors.Trace(ddl.ErrWrongTableName.GenWithStackByArgs(sName))
 		return
 	}
 }

@@ -273,4 +273,7 @@ var (
 
 	// ErrUnknownEngine is returned when the table engine is unknown.
 	ErrUnknownEngine = dbterror.ClassDDL.NewStd(mysql.ErrUnknownStorageEngine)
+
+	// ErrEventEndsBeforeStarts is returned when the event's ends is before its starts.
+	ErrEventEndsBeforeStarts = dbterror.ClassDDL.NewStd(mysql.ErrEventEndsBeforeStarts)
 )

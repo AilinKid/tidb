@@ -29,6 +29,8 @@ var (
 	ErrDatabaseNotExists = dbterror.ClassSchema.NewStd(mysql.ErrBadDB)
 	// ErrTableExists returns for table already exists.
 	ErrTableExists = dbterror.ClassSchema.NewStd(mysql.ErrTableExists)
+	// ErrEventExists returns for event already exists.
+	ErrEventExists = dbterror.ClassSchema.NewStd(mysql.ErrEventAlreadyExists)
 	// ErrTableDropExists returns for dropping a non-existent table.
 	ErrTableDropExists = dbterror.ClassSchema.NewStd(mysql.ErrBadTable)
 	// ErrSequenceDropExists returns for dropping a non-exist sequence.

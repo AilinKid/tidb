@@ -124,6 +124,8 @@ func (e *DDLExec) Next(ctx context.Context, req *chunk.Chunk) (err error) {
 		err = e.executeDropSequence(x)
 	case *ast.AlterSequenceStmt:
 		err = e.executeAlterSequence(x)
+	case *ast.CreateEventStmt:
+		err = e.executeCreateEvent(x)
 	}
 	if err != nil {
 		// If the owner return ErrTableNotExists error when running this DDL, it may be caused by schema changed,
@@ -621,4 +623,8 @@ func (e *DDLExec) executeCreateSequence(s *ast.CreateSequenceStmt) error {
 
 func (e *DDLExec) executeAlterSequence(s *ast.AlterSequenceStmt) error {
 	return domain.GetDomain(e.ctx).DDL().AlterSequence(e.ctx, s)
+}
+
+func (e *DDLExec) executeCreateEvent(s *ast.CreateEventStmt) error {
+	return domain.GetDomain(e.ctx).DDL().CreateEvent(e.ctx, s)
 }

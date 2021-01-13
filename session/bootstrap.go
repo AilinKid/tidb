@@ -322,7 +322,7 @@ const (
 
 	// CreateEventTable stores the event information.
 	CreateEventTable = `CREATE TABLE IF NOT EXISTS mysql.async_event (
-		EVENT_ID bigint,
+		EVENT_ID bigint auto_increment key,
 		EVENT_NAME varchar(64),
 		EVENT_SCHEMA_ID bigint,
 		EVENT_SCHEMA_NAME varchar(64),
