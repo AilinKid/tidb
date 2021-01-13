@@ -72,7 +72,7 @@ const (
 	selectEventTableByIDSQL   = `SELECT * FROM mysql.async_event where event_id = %d and event_schema_id = %d`
 	selectEventTableByNameSQL = `SELECT * FROM mysql.async_event where event_name = "%s" and event_schema_name = "%s"`
 
-	selectEventTableFetchExecutableEvents = `SELECT * FROM mysql.async_event where status="ENABLED" and NEXT_EXECUTE_AT < UTC_TIMESTAMP() limit 1 for update`
+	selectEventTableFetchExecutableEvents = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = self_uuid) and NEXT_EXECUTE_AT < UTC_TIMESTAMP() limit 1 for update`
 )
 
 // Insert store a eventInfo into physical system table --- event.
