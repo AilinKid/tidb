@@ -1731,12 +1731,19 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	}
 
 	// Check event existence.
+	onExist := OnExistError
+	if s.IfNotExists {
+		onExist = OnExistIgnore
+	}
 	old, err := event.CheckExist(ctx, ident)
 	if err != nil {
 		return err
 	}
 	if old != nil {
-		return infoschema.ErrEventExists.GenWithStackByArgs(ident.Name)
+		if onExist == OnExistError {
+			return infoschema.ErrEventExists.GenWithStackByArgs(ident.Name)
+		}
+		return nil
 	}
 
 	// Since event doesn't share namespace with table-level objects, we don't need
@@ -1817,7 +1824,25 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		eventInfo.Ends = endTime.GetMysqlTime()
 	}
 
-	return nil
+	args := []interface{}{eventInfo}
+	job := &model.Job{
+		SchemaID:   schema.ID,
+		SchemaName: schema.Name.L,
+		Type:       model.ActionCreateEvent,
+		BinlogInfo: &model.HistoryInfo{},
+		Args:       args,
+	}
+
+	err = d.doDDLJob(ctx, job)
+	if err != nil {
+		// event exists, but if_not_exists flags is true, so we ignore this error.
+		if onExist == OnExistIgnore && infoschema.ErrEventExists.Equal(err) {
+			ctx.GetSessionVars().StmtCtx.AppendNote(err)
+			err = nil
+		}
+	}
+	err = d.callHookOnChanged(err)
+	return errors.Trace(err)
 }
 
 func (d *ddl) CreateTable(ctx sessionctx.Context, s *ast.CreateTableStmt) (err error) {
