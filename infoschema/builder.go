@@ -43,6 +43,8 @@ type Builder struct {
 func (b *Builder) ApplyDiff(m *meta.Meta, diff *model.SchemaDiff) ([]int64, error) {
 	b.is.schemaMetaVersion = diff.Version
 	switch diff.Type {
+	case model.ActionCreateEvent, model.ActionAlterEvent, model.ActionDropEvent:
+		return []int64{}, nil
 	case model.ActionCreateSchema:
 		return nil, b.applyCreateSchema(m, diff)
 	case model.ActionDropSchema:

@@ -14,59 +14,87 @@
 package ddl
 
 import (
+	"context"
+	"strings"
 	"time"
 
 	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/ddl/event"
+	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/sessionctx"
+	"github.com/pingcap/tidb/types"
+	"github.com/pingcap/tidb/util/logutil"
+	"github.com/pingcap/tidb/util/sqlexec"
 )
 
 type Scheduler struct {
+	ctx                    context.Context
 	uuid                   string
 	sessPool               *sessionPool
 	eventDDLChangedChannel <-chan struct{}
 }
 
-func newScheduler(uuid string, pool *sessionPool, c <-chan struct{}) *Scheduler {
+func newScheduler(ctx context.Context, uuid string, pool *sessionPool, eventDDLChangedChannel <-chan struct{}) *Scheduler {
 	return &Scheduler{
+		ctx:                    ctx,
 		uuid:                   uuid,
 		sessPool:               pool,
-		eventDDLChangedChannel: c,
+		eventDDLChangedChannel: eventDDLChangedChannel,
 	}
 }
 
+func (d *ddl) runEventScheduler(eventDDLChangedChannel <-chan struct{}) {
+	defer d.wg.Done()
+	eventScheduler := newScheduler(d.ctx, d.uuid, d.sessPool, eventDDLChangedChannel)
+	eventScheduler.Run()
+}
+
 func (s *Scheduler) Run() {
+	// Set the event scheduler running status, avoid blocking the eventDDLChangedChannel write channel.
+	EventSchedulerRunning.Store(true)
+	defer EventSchedulerRunning.Store(false)
+
 	// Set the max triggering time, at least triggering once every day.
 	nextTriggerTime := time.Now().Add(24 * time.Hour)
+	// Try to claim events to its best.
+	sctx, err := s.sessPool.get()
+	if err != nil {
+		logutil.BgLogger().Info("[event] scheduler get session from pool fail")
+		return
+	}
+	defer s.sessPool.put(sctx)
 	for {
 		select {
 		// Related ddl events triggered.
 		case <-s.eventDDLChangedChannel:
 		// Next triggering time triggered.
 		case <-time.After(nextTriggerTime.Sub(time.Now())): // TODO overflow check
+		// scheduler is dead.
+		case <-s.ctx.Done():
+			return
 		}
 
 		nextTriggerTime = time.Now().Add(24 * time.Hour)
-
-		// Try to complete events to its best.
-		sctx, err := s.sessPool.get()
-		if err != nil {
-			//log
-		}
 		err = claimTriggeredEvents(sctx, s.uuid)
 		if err != nil {
-			// TODO: store the error msg.
+			logutil.BgLogger().Info("[event] claim event from system table fail")
+			return
 		}
 
-		findNextTriggerTime(sctx)
-
-		//for _, event := range listAllEvents() {
-		//	if event.ExecuteAt <= now {
-		//		event.Trigger()
-		//		event.Reschedule() // rescheduling may disable or drop the event
-		//	}
-		//	nextTriggerTime = min(nextTriggerTime, event.ExecuteAt)
-		//}
+		// Set the next trigger time.
+		nextTime, err := findNextTriggerTime(sctx, s.uuid)
+		if err != nil {
+			logutil.BgLogger().Info("[event] fetch most recent event from system table fail")
+			return
+		}
+		if !nextTime.IsZero() {
+			// TODO: timezone?
+			nextTriggerTime, err = nextTime.GoTime(time.Local)
+			if err != nil {
+				logutil.BgLogger().Info("[event] fetch most recent event from system table fail")
+				return
+			}
+		}
 	}
 }
 
@@ -74,10 +102,22 @@ func claimTriggeredEvents(sctx sessionctx.Context, uuid string) error {
 	for {
 		statement, err := event.Claim(sctx, uuid)
 		if err != nil {
+			if kv.ErrTxnRetryable.Equal(err) || kv.ErrWriteConflict.Equal(err) || kv.ErrWriteConflictInTiDB.Equal(err) {
+				// the claimed event is done by other TiDB node, retry to fetch other triggered events.
+				continue
+			}
 			return errors.Trace(err)
 		}
 		if statement != "" {
 			// Execute event action.
+			sqls := strings.Split(statement, ";")
+			for _, sql := range sqls {
+				_, err := sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
+				if err != nil {
+					// TODO: record the error message down.
+					break
+				}
+			}
 		} else {
 			// There is no valid triggered events.
 			return nil
@@ -85,6 +125,6 @@ func claimTriggeredEvents(sctx sessionctx.Context, uuid string) error {
 	}
 }
 
-func findNextTriggerTime(sctx sessionctx.Context) {
-
+func findNextTriggerTime(sctx sessionctx.Context, uuid string) (types.Time, error) {
+	return event.FetchMostRecentEvent(sctx, uuid)
 }

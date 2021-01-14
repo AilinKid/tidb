@@ -284,6 +284,8 @@ func (do *Domain) tryLoadSchemaDiffs(m *meta.Meta, usedVersion, newVersion int64
 		if canSkipSchemaCheckerDDL(diff.Type) {
 			continue
 		}
+		checkNodifyEventScheduler(diff.Type)
+
 		phyTblIDs = append(phyTblIDs, IDs...)
 		for i := 0; i < len(IDs); i++ {
 			actions = append(actions, uint64(1<<diff.Type))
@@ -294,6 +296,15 @@ func (do *Domain) tryLoadSchemaDiffs(m *meta.Meta, usedVersion, newVersion int64
 	relatedChange.PhyTblIDS = phyTblIDs
 	relatedChange.ActionTypes = actions
 	return true, &relatedChange, nil
+}
+
+func checkNodifyEventScheduler(tp model.ActionType) {
+	switch tp {
+	case model.ActionCreateEvent, model.ActionAlterEvent, model.ActionDropEvent:
+		if ddl.EventSchedulerRunning.Load() {
+			ddl.EventDDLChangedChannel <- struct{}{}
+		}
+	}
 }
 
 func canSkipSchemaCheckerDDL(tp model.ActionType) bool {
@@ -742,7 +753,7 @@ func (do *Domain) Init(ddlLease time.Duration, sysFactory func(*Domain) (pools.R
 	sysFac := func() (pools.Resource, error) {
 		return sysFactory(do)
 	}
-	sysCtxPool := pools.NewResourcePool(sysFac, 2, 2, resourceIdleTimeout)
+	sysCtxPool := pools.NewResourcePool(sysFac, 3, 3, resourceIdleTimeout)
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	do.cancel = cancelFunc
 	callback := &ddlCallback{do: do}

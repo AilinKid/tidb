@@ -14,6 +14,7 @@
 package ddl
 
 import (
+	"fmt"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/model"
@@ -24,6 +25,7 @@ import (
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/meta"
 	"github.com/pingcap/tidb/types"
+	"github.com/pingcap/tidb/util/logutil"
 )
 
 func (w *worker) onCreateEvent(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int64, _ error) {
@@ -45,16 +47,19 @@ func (w *worker) onCreateEvent(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int
 	}
 
 	// Double check event existence.
+	fmt.Println("get1")
 	sctx, err := w.sessPool.get()
 	if err != nil {
 		return ver, errors.Trace(err)
 	}
+	fmt.Println("get2")
 	defer w.sessPool.put(sctx)
 	old, err := event.CheckExist(sctx, ast.Ident{Schema: eventInfo.EventSchemaName, Name: eventInfo.EventName})
 	if err != nil {
 		// Wait for retry.
 		return ver, errors.Trace(err)
 	}
+	fmt.Println("check1")
 	if old != nil {
 		job.State = model.JobStateCancelled
 		return ver, errors.Trace(infoschema.ErrEventExists.GenWithStackByArgs(eventInfo.EventName))
@@ -62,6 +67,16 @@ func (w *worker) onCreateEvent(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int
 
 	err = event.Insert(eventInfo, sctx)
 	if err != nil {
+		return ver, errors.Trace(err)
+	}
+	fmt.Println("insert1")
+	ver, err = updateSchemaVersion(t, job)
+	if err != nil {
+		// Since t and sctx is in two different txn, so it should clean the inserted event here.
+		err1 := event.Delete(eventInfo, sctx)
+		if err1 != nil {
+			logutil.BgLogger().Warn("[event] clean inserted event from event table failed")
+		}
 		return ver, errors.Trace(err)
 	}
 	// Finish this job.

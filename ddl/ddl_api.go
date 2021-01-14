@@ -1844,6 +1844,7 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	args := []interface{}{eventInfo, eventInfo.ExecuteAt.CoreTime(), eventInfo.Starts.CoreTime(), eventInfo.Ends.CoreTime(), eventInfo.NextExecuteAt.CoreTime()}
 	job := &model.Job{
 		SchemaID:   schema.ID,
+		TableID:    eventInfo.EventID,
 		SchemaName: schema.Name.L,
 		Type:       model.ActionCreateEvent,
 		BinlogInfo: &model.HistoryInfo{},

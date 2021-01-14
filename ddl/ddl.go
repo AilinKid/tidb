@@ -21,6 +21,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/uber-go/atomic"
 	"sync"
 	"time"
 
@@ -85,6 +86,13 @@ var (
 	// a newly created table. It takes effect only if the Storage supports split
 	// region.
 	EnableSplitTableRegion = uint32(0)
+
+	// EventDDLChangedChannel is used to receive the schema change signal of async event
+	// in applyDiff phase. The signal will help event scheduler to check whether there are
+	// valid events to run in this TiDB instance.
+	EventDDLChangedChannel = make(chan struct{}, 10)
+
+	EventSchedulerRunning atomic.Bool
 )
 
 // DDL is responsible for updating schema in data store and maintaining in-memory InfoSchema cache.
@@ -330,6 +338,11 @@ func (d *ddl) Start(ctxPool *pools.ResourcePool) error {
 
 	d.wg.Add(1)
 	go d.limitDDLJobs()
+
+	// TODO: receive the real event signal channel from apply diff.
+
+	d.wg.Add(1)
+	go d.runEventScheduler(EventDDLChangedChannel)
 
 	// If RunWorker is true, we need campaign owner and do DDL job.
 	// Otherwise, we needn't do that.

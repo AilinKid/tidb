@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/pingcap/parser/terror"
+	"github.com/pingcap/tidb/types"
 	"strings"
 
 	"github.com/pingcap/errors"
@@ -69,11 +70,32 @@ const (
 
 	insertEventTableSQL = insertEventTablePrefix + insertEventTableValue
 
-	selectEventTableByIDSQL   = `SELECT * FROM mysql.async_event where event_id = %d and event_schema_id = %d`
+	selectEventTableByIDSQL = `SELECT * FROM mysql.async_event where event_id = %d and event_schema_id = %d`
+
 	selectEventTableByNameSQL = `SELECT * FROM mysql.async_event where event_name = "%s" and event_schema_name = "%s"`
 
-	selectEventTableFetchExecutableEvents = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") and NEXT_EXECUTE_AT <= NOW() limit 1 for update`
+	selectEventTableFetchExecutableEvent = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") and NEXT_EXECUTE_AT <= NOW() limit 1 for update`
+
+	selectEventTableFetchMostRecentEvent = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") order by NEXT_EXECUTE_AT limit 1`
+
+	deleteEventTableByIDSQL = `DELETE * FROM mysql.async_event where event_id = %d and event_schema_id = %d`
+
+	updateEventTableByIDSQL = `UPDATE mysql.async_event set STATUS = "%s", NEXT_EXECUTE_AT = "%s" where event_id = %d and event_schema_id = %d`
 )
+
+// FetchMostRecentEvent fetch the most recent event's trigger time.
+func FetchMostRecentEvent(sctx sessionctx.Context, uuid string) (types.Time, error) {
+	sql := fmt.Sprintf(selectEventTableFetchMostRecentEvent, uuid)
+	res, err := getEventInfos(sctx, sql)
+	if err != nil {
+		return types.ZeroTime, errors.Trace(err)
+	}
+	if len(res) == 0 {
+		// no triggered event waited to run.
+		return types.ZeroTime, nil
+	}
+	return res[0].NextExecuteAt, nil
+}
 
 // Claim is used to claim a triggered event int the system table concurrently.
 func Claim(sctx sessionctx.Context, uuid string) (string, error) {
@@ -84,11 +106,18 @@ func Claim(sctx sessionctx.Context, uuid string) (string, error) {
 		return "", errors.Trace(err)
 	}
 	// Select for update.
-	sql := fmt.Sprintf(selectEventTableFetchExecutableEvents, uuid)
-	res, err := getEventInfosFromSQLExecutor(sctx, sql)
+	sql := fmt.Sprintf(selectEventTableFetchExecutableEvent, uuid)
+	res, err := getEventInfos(sctx, sql)
+	if err != nil {
+		return "", errors.Trace(err)
+	}
+	if len(res) == 0 {
+		return "", nil
+	}
+
 	// Update.
 	targetEvent := res[0]
-	err = Insert2(targetEvent, sctx)
+	err = Update(targetEvent, sctx)
 	if err != nil {
 		return "", errors.Trace(err)
 	}
@@ -101,49 +130,25 @@ func Claim(sctx sessionctx.Context, uuid string) (string, error) {
 	return targetEvent.Statement, nil
 }
 
-func getEventInfosFromSQLExecutor(sctx sessionctx.Context, sql string) ([]*model2.EventInfo, error) {
-	res, err := sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.Background(), sql)
-	if err != nil {
-		return nil, errors.Trace(err)
-	}
-	// Single query only has single result.
-	rs := res[0]
-	defer terror.Call(rs.Close)
-	req := rs.NewChunk()
-	eventInfos := make([]*model2.EventInfo, 0, req.NumRows())
-	for {
-		err = rs.Next(context.TODO(), req)
-		if err != nil {
-			return nil, errors.Trace(err)
-		}
-		if req.NumRows() == 0 {
-			return eventInfos, nil
-		}
-		it := chunk.NewIterator4Chunk(req)
-		for row := it.Begin(); row != it.End(); row = it.Next() {
-			eventInfos = append(eventInfos, DecodeRowIntoEventInfo(new(model2.EventInfo), row))
-		}
-		// NOTE: decodeTableRow decodes data from a chunk Row, that is a shallow copy.
-		// The result will reference memory in the chunk, so the chunk must not be reused
-		// here, otherwise some werid bug will happen!
-		req = chunk.Renew(req, sctx.GetSessionVars().MaxChunkSize)
-	}
+// Delete delete a eventInfo in physical system table.
+func Delete(e *model2.EventInfo, sctx sessionctx.Context) error {
+	sql := fmt.Sprintf(deleteEventTableByIDSQL, e.EventID, e.EventSchemaID)
+
+	logutil.BgLogger().Info("[event] delete from event table", zap.Int64("eventID", e.EventID), zap.Int64("event schema ID", e.EventSchemaID))
+	_, err := sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
+	return errors.Trace(err)
 }
 
-// Insert store a eventInfo into physical system table --- event.
-func Insert2(e *model2.EventInfo, sctx sessionctx.Context) error {
+//
+func Update(e *model2.EventInfo, sctx sessionctx.Context) error {
 	// compute the next execution time.
 	err := e.ComputeNextExecuteUTCTime(sctx)
 	if err != nil {
 		return err
 	}
-	sql := fmt.Sprintf(insertEventTableSQL, e.EventID, e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
-		e.Definer.String(), e.SQLMode, e.TimeZone, e.BodyType, e.EventType, e.Statement,
-		e.ExecuteAt.String(), e.Starts.String(), e.Ends.String(), e.IntervalValue, e.IntervalUnit,
-		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.Collation, e.Comment, e.NextExecuteAt)
-
-	logutil.BgLogger().Info("[event] insert into event table", zap.Int64("eventID", e.EventID), zap.String("eventName", e.EventSchemaName.L))
-	_, err = sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.Background(), sql)
+	sql := fmt.Sprintf(updateEventTableByIDSQL, e.Enable.String(), e.NextExecuteAt.String(), e.EventID, e.EventSchemaID)
+	logutil.BgLogger().Info("[event] update event table", zap.Int64("eventID", e.EventID), zap.Int64("event schema ID", e.EventSchemaID))
+	_, err = sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
 	return errors.Trace(err)
 }
 
@@ -157,10 +162,10 @@ func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 	sql := fmt.Sprintf(insertEventTableSQL, e.EventID, e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
 		e.Definer.String(), e.SQLMode, e.TimeZone, e.BodyType, e.EventType, e.Statement,
 		e.ExecuteAt.String(), e.Starts.String(), e.Ends.String(), e.IntervalValue, e.IntervalUnit,
-		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.Collation, e.Comment, e.NextExecuteAt)
+		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.Collation, e.Comment, e.NextExecuteAt.String())
 
-	logutil.BgLogger().Info("[event] insert into event table", zap.Int64("eventID", e.EventID), zap.String("eventName", e.EventSchemaName.L))
-	_, _, err = sctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(sql)
+	logutil.BgLogger().Info("[event] insert into event table", zap.Int64("eventID", e.EventID), zap.Int64("event schema ID", e.EventSchemaID))
+	_, err = sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
 	return errors.Trace(err)
 }
 
@@ -199,15 +204,32 @@ func ScanEventInfo(sctx sessionctx.Context, sql string) ([]*model2.EventInfo, er
 }
 
 func getEventInfos(sctx sessionctx.Context, sql string) ([]*model2.EventInfo, error) {
-	res, _, err := sctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(sql)
+	res, err := sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
-	eventInfos := make([]*model2.EventInfo, 0, len(res))
-	for _, row := range res {
-		eventInfos = append(eventInfos, DecodeRowIntoEventInfo(new(model2.EventInfo), row))
+	// Single query only has single result.
+	rs := res[0]
+	defer terror.Call(rs.Close)
+	req := rs.NewChunk()
+	eventInfos := make([]*model2.EventInfo, 0, req.NumRows())
+	for {
+		err = rs.Next(context.TODO(), req)
+		if err != nil {
+			return nil, errors.Trace(err)
+		}
+		if req.NumRows() == 0 {
+			return eventInfos, nil
+		}
+		it := chunk.NewIterator4Chunk(req)
+		for row := it.Begin(); row != it.End(); row = it.Next() {
+			eventInfos = append(eventInfos, DecodeRowIntoEventInfo(new(model2.EventInfo), row))
+		}
+		// NOTE: decodeTableRow decodes data from a chunk Row, that is a shallow copy.
+		// The result will reference memory in the chunk, so the chunk must not be reused
+		// here, otherwise some werid bug will happen!
+		req = chunk.Renew(req, sctx.GetSessionVars().MaxChunkSize)
 	}
-	return eventInfos, nil
 }
 
 // DecodeRowIntoEventInfo decode a *eventInfo from one row.
