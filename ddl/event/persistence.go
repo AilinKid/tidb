@@ -14,7 +14,9 @@
 package event
 
 import (
+	"context"
 	"fmt"
+	"github.com/pingcap/parser/terror"
 	"strings"
 
 	"github.com/pingcap/errors"
@@ -22,7 +24,7 @@ import (
 	"github.com/pingcap/parser/auth"
 	"github.com/pingcap/parser/model"
 	"github.com/pingcap/parser/mysql"
-	model2 "github.com/pingcap/tidb/event/model"
+	model2 "github.com/pingcap/tidb/ddl/event/model"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/util/chunk"
 	"github.com/pingcap/tidb/util/logutil"
@@ -70,8 +72,80 @@ const (
 	selectEventTableByIDSQL   = `SELECT * FROM mysql.async_event where event_id = %d and event_schema_id = %d`
 	selectEventTableByNameSQL = `SELECT * FROM mysql.async_event where event_name = "%s" and event_schema_name = "%s"`
 
-	selectEventTableFetchExecutableEvents = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = self_uuid) and NEXT_EXECUTE_AT < UTC_TIMESTAMP() limit 1 for update`
+	selectEventTableFetchExecutableEvents = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") and NEXT_EXECUTE_AT <= NOW() limit 1 for update`
 )
+
+// Claim is used to claim a triggered event int the system table concurrently.
+func Claim(sctx sessionctx.Context, uuid string) (string, error) {
+	logutil.BgLogger().Info("[event] start claim event")
+	// Begin.
+	_, err := sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), "begin")
+	if err != nil {
+		return "", errors.Trace(err)
+	}
+	// Select for update.
+	sql := fmt.Sprintf(selectEventTableFetchExecutableEvents, uuid)
+	res, err := getEventInfosFromSQLExecutor(sctx, sql)
+	// Update.
+	targetEvent := res[0]
+	err = Insert2(targetEvent, sctx)
+	if err != nil {
+		return "", errors.Trace(err)
+	}
+	// Commit.
+	_, _, err = sctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL("commit")
+	if err != nil {
+		logutil.BgLogger().Info("[event] claim event commit fail.")
+		return "", errors.Trace(err)
+	}
+	return targetEvent.Statement, nil
+}
+
+func getEventInfosFromSQLExecutor(sctx sessionctx.Context, sql string) ([]*model2.EventInfo, error) {
+	res, err := sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.Background(), sql)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	// Single query only has single result.
+	rs := res[0]
+	defer terror.Call(rs.Close)
+	req := rs.NewChunk()
+	eventInfos := make([]*model2.EventInfo, 0, req.NumRows())
+	for {
+		err = rs.Next(context.TODO(), req)
+		if err != nil {
+			return nil, errors.Trace(err)
+		}
+		if req.NumRows() == 0 {
+			return eventInfos, nil
+		}
+		it := chunk.NewIterator4Chunk(req)
+		for row := it.Begin(); row != it.End(); row = it.Next() {
+			eventInfos = append(eventInfos, DecodeRowIntoEventInfo(new(model2.EventInfo), row))
+		}
+		// NOTE: decodeTableRow decodes data from a chunk Row, that is a shallow copy.
+		// The result will reference memory in the chunk, so the chunk must not be reused
+		// here, otherwise some werid bug will happen!
+		req = chunk.Renew(req, sctx.GetSessionVars().MaxChunkSize)
+	}
+}
+
+// Insert store a eventInfo into physical system table --- event.
+func Insert2(e *model2.EventInfo, sctx sessionctx.Context) error {
+	// compute the next execution time.
+	err := e.ComputeNextExecuteUTCTime(sctx)
+	if err != nil {
+		return err
+	}
+	sql := fmt.Sprintf(insertEventTableSQL, e.EventID, e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
+		e.Definer.String(), e.SQLMode, e.TimeZone, e.BodyType, e.EventType, e.Statement,
+		e.ExecuteAt.String(), e.Starts.String(), e.Ends.String(), e.IntervalValue, e.IntervalUnit,
+		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.Collation, e.Comment, e.NextExecuteAt)
+
+	logutil.BgLogger().Info("[event] insert into event table", zap.Int64("eventID", e.EventID), zap.String("eventName", e.EventSchemaName.L))
+	_, err = sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.Background(), sql)
+	return errors.Trace(err)
+}
 
 // Insert store a eventInfo into physical system table --- event.
 func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {

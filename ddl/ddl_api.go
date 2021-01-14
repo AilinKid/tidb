@@ -20,8 +20,6 @@ package ddl
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/pingcap/tidb/event"
-	model2 "github.com/pingcap/tidb/event/model"
 	"math"
 	"strconv"
 	"strings"
@@ -40,6 +38,8 @@ import (
 	"github.com/pingcap/parser/terror"
 	field_types "github.com/pingcap/parser/types"
 	"github.com/pingcap/tidb/config"
+	"github.com/pingcap/tidb/ddl/event"
+	model2 "github.com/pingcap/tidb/ddl/event/model"
 	"github.com/pingcap/tidb/ddl/placement"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/infoschema"
@@ -1738,13 +1738,19 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	if !ok {
 		return errors.Trace(infoschema.ErrDatabaseNotExists.GenWithStackByArgs(ident.Schema))
 	}
+	// fetch sctx from sessionPool to avoid active txn in ctx.
+	session, err := d.sessPool.get()
+	if err != nil {
+		return errors.Trace(err)
+	}
+	defer d.sessPool.put(session)
 
 	// Check event existence.
 	onExist := OnExistError
 	if s.IfNotExists {
 		onExist = OnExistIgnore
 	}
-	old, err := event.CheckExist(ctx, ident)
+	old, err := event.CheckExist(session, ident)
 	if err != nil {
 		return err
 	}
@@ -5662,10 +5668,6 @@ func (d *ddl) OrderByColumns(ctx sessionctx.Context, ident ast.Ident) error {
 		ctx.GetSessionVars().StmtCtx.AppendWarning(errors.Errorf("ORDER BY ignored as there is a user-defined clustered index in the table '%s'", ident.Name))
 	}
 	return nil
-}
-
-func buildEventInfo() {
-
 }
 
 func (d *ddl) CreateSequence(ctx sessionctx.Context, stmt *ast.CreateSequenceStmt) error {

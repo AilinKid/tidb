@@ -20,8 +20,8 @@ import (
 	"github.com/pingcap/parser/auth"
 	"github.com/pingcap/parser/model"
 	"github.com/pingcap/parser/mysql"
-	"github.com/pingcap/tidb/event"
-	model2 "github.com/pingcap/tidb/event/model"
+	"github.com/pingcap/tidb/ddl/event"
+	model2 "github.com/pingcap/tidb/ddl/event/model"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/testkit"
 )
@@ -54,10 +54,10 @@ func (s *persistenceSuite) TestEventSystemTable(c *C) {
 		IntervalValue: "3",
 		IntervalUnit:  ast.TimeUnitHour,
 
-		Enable:     model2.TypeSlaveSideDisabled,
+		Enable:     model2.TypeEnabled,
 		Preserve:   true,
 		Originator: 1,
-		Instance:   "ABC123",
+		Instance:   "",
 		Charset:    "UTF8",
 		Collation:  "UTF8MB4",
 		Comment:    "Nothing",
@@ -122,4 +122,8 @@ func (s *persistenceSuite) TestEventSystemTable(c *C) {
 	c.Assert(e.Charset, Equals, e3.Charset)
 	c.Assert(e.Collation, Equals, e3.Collation)
 	c.Assert(e.Comment, Equals, e3.Comment)
+
+	statement, err := event.Claim(tk.Se, "")
+	c.Assert(err, IsNil)
+	c.Assert(statement, Equals, "select * from t")
 }

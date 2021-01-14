@@ -86,4 +86,4 @@ require (
 
 go 1.13
 
-replace github.com/pingcap/parser => github.com/kennytm/parser v0.0.0-20210113145215-e8a2a3e822b1
+replace github.com/pingcap/parser => github.com/kennytm/parser v0.0.0-20210114071928-41f6467942d8

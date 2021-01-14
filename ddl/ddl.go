@@ -364,6 +364,8 @@ func (d *ddl) Start(ctxPool *pools.ResourcePool) error {
 		metrics.DDLCounter.WithLabelValues(metrics.StartCleanWork).Inc()
 	}
 
+	//eventScheduler := newScheduler(d.uuid, d.sessPool, )
+	//go eventScheduler.Run()
 	variable.RegisterStatistics(d)
 
 	metrics.DDLCounter.WithLabelValues(metrics.CreateDDLInstance).Inc()
