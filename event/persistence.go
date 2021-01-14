@@ -14,16 +14,14 @@
 package event
 
 import (
-	"context"
 	"fmt"
-	"github.com/pingcap/parser/ast"
 	"strings"
 
 	"github.com/pingcap/errors"
+	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/auth"
 	"github.com/pingcap/parser/model"
 	"github.com/pingcap/parser/mysql"
-	"github.com/pingcap/parser/terror"
 	model2 "github.com/pingcap/tidb/event/model"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/util/chunk"
@@ -62,7 +60,7 @@ const (
 	// COMMENT           |    varchar(2048)
 
 	// NEXT_EXECUTE_AT   |    datetime
-	insertEventTableValue = `(%s, "%s", %d, "%s",
+	insertEventTableValue = `(%d, "%s", %d, "%s",
 		"%s", %d, "%s", "%s", "%s", "%s",
 		"%s", "%s", "%s", "%s", "%d",
 		"%s", %t, %d, "%s", "%s", "%s", "%s", "%s")`
@@ -82,18 +80,18 @@ func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 	if err != nil {
 		return err
 	}
-	sql := fmt.Sprintf(insertEventTableSQL, "default", e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
+	sql := fmt.Sprintf(insertEventTableSQL, e.EventID, e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
 		e.Definer.String(), e.SQLMode, e.TimeZone, e.BodyType, e.EventType, e.Statement,
 		e.ExecuteAt.String(), e.Starts.String(), e.Ends.String(), e.IntervalValue, e.IntervalUnit,
 		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.Collation, e.Comment, e.NextExecuteAt)
 
 	logutil.BgLogger().Info("[event] insert into event table", zap.Int64("eventID", e.EventID), zap.String("eventName", e.EventSchemaName.L))
-	_, err = sctx.(sqlexec.SQLExecutor).Execute(context.Background(), sql)
+	_, _, err = sctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(sql)
 	return errors.Trace(err)
 }
 
 func CheckExist(sctx sessionctx.Context, ident ast.Ident) (*model2.EventInfo, error) {
-	return GetFromName(sctx, ident.Schema.L, ident.Name.L)
+	return GetFromName(sctx, ident.Name.L, ident.Schema.L)
 }
 
 // GetFromID fetch a *eventInfo with eventID and eventSchemaID via index.
@@ -127,32 +125,15 @@ func ScanEventInfo(sctx sessionctx.Context, sql string) ([]*model2.EventInfo, er
 }
 
 func getEventInfos(sctx sessionctx.Context, sql string) ([]*model2.EventInfo, error) {
-	res, err := sctx.(sqlexec.SQLExecutor).Execute(context.Background(), sql)
+	res, _, err := sctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(sql)
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
-	// Single query only has single result.
-	rs := res[0]
-	defer terror.Call(rs.Close)
-	req := rs.NewChunk()
-	eventInfos := make([]*model2.EventInfo, 0, req.NumRows())
-	for {
-		err = rs.Next(context.TODO(), req)
-		if err != nil {
-			return nil, errors.Trace(err)
-		}
-		if req.NumRows() == 0 {
-			return eventInfos, nil
-		}
-		it := chunk.NewIterator4Chunk(req)
-		for row := it.Begin(); row != it.End(); row = it.Next() {
-			eventInfos = append(eventInfos, DecodeRowIntoEventInfo(new(model2.EventInfo), row))
-		}
-		// NOTE: decodeTableRow decodes data from a chunk Row, that is a shallow copy.
-		// The result will reference memory in the chunk, so the chunk must not be reused
-		// here, otherwise some werid bug will happen!
-		req = chunk.Renew(req, sctx.GetSessionVars().MaxChunkSize)
+	eventInfos := make([]*model2.EventInfo, 0, len(res))
+	for _, row := range res {
+		eventInfos = append(eventInfos, DecodeRowIntoEventInfo(new(model2.EventInfo), row))
 	}
+	return eventInfos, nil
 }
 
 // DecodeRowIntoEventInfo decode a *eventInfo from one row.

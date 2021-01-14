@@ -28,8 +28,6 @@ import (
 	"github.com/pingcap/tidb/ddl/placement"
 	"github.com/pingcap/tidb/ddl/util"
 	"github.com/pingcap/tidb/domain/infosync"
-	"github.com/pingcap/tidb/event"
-	model2 "github.com/pingcap/tidb/event/model"
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/meta"
@@ -42,44 +40,6 @@ import (
 
 const tiflashCheckTiDBHTTPAPIHalfInterval = 2500 * time.Millisecond
 
-func (w *worker) onCreateEvent(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int64, _ error) {
-	eventInfo := &model2.EventInfo{}
-	if err := job.DecodeArgs(eventInfo); err != nil {
-		// Invalid arguments, cancel this job.
-		job.State = model.JobStateCancelled
-		return ver, errors.Trace(err)
-	}
-	// Double check schema existence.
-	_, err := checkSchemaExistAndCancelNotExistJob(t, job)
-	if err != nil {
-		return ver, errors.Trace(err)
-	}
-
-	// Double check event existence.
-	sctx, err := w.sessPool.get()
-	if err != nil {
-		return ver, errors.Trace(err)
-	}
-	defer w.sessPool.put(sctx)
-	old, err := event.CheckExist(sctx, ast.Ident{Schema: eventInfo.EventSchemaName, Name: eventInfo.EventName})
-	if err != nil {
-		// Wait for retry.
-		return ver, errors.Trace(err)
-	}
-	if old != nil {
-		job.State = model.JobStateCancelled
-		return ver, errors.Trace(infoschema.ErrEventExists.GenWithStackByArgs(eventInfo.EventName))
-	}
-
-	err = event.Insert(eventInfo, sctx)
-	if err != nil {
-		return ver, errors.Trace(err)
-	}
-	// Finish this job.
-	job.FinishTableJob(model.JobStateDone, model.StatePublic, ver, nil)
-	asyncNotifyEvent(d, &util.Event{Tp: model.ActionCreateEvent})
-	return ver, nil
-}
 func onCreateTable(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int64, _ error) {
 	failpoint.Inject("mockExceedErrorLimit", func(val failpoint.Value) {
 		if val.(bool) {
