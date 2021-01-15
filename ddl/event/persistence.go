@@ -1,4 +1,4 @@
-// Copyright 2020 PingCAP, Inc.
+// Copyright 2021 PingCAP, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,10 @@ package event
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/pingcap/parser/terror"
 	"github.com/pingcap/tidb/types"
-	"strings"
 
 	"github.com/pingcap/errors"
 	"github.com/pingcap/parser/ast"
@@ -76,16 +77,16 @@ const (
 
 	selectEventTableFetchExecutableEvent = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") and NEXT_EXECUTE_AT <= NOW() limit 1 for update`
 
-	selectEventTableFetchMostRecentEvent = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") order by NEXT_EXECUTE_AT limit 1`
+	selectEventTableFetchNextScheduledEvent = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") order by NEXT_EXECUTE_AT limit 1`
 
 	deleteEventTableByIDSQL = `DELETE * FROM mysql.async_event where event_id = %d and event_schema_id = %d`
 
 	updateEventTableByIDSQL = `UPDATE mysql.async_event set STATUS = "%s", NEXT_EXECUTE_AT = "%s" where event_id = %d and event_schema_id = %d`
 )
 
-// FetchMostRecentEvent fetch the most recent event's trigger time.
-func FetchMostRecentEvent(sctx sessionctx.Context, uuid string) (types.Time, error) {
-	sql := fmt.Sprintf(selectEventTableFetchMostRecentEvent, uuid)
+// FetchNextScheduledEvent fetch the next event to be scheduled
+func FetchNextScheduledEvent(sctx sessionctx.Context, uuid string) (types.Time, error) {
+	sql := fmt.Sprintf(selectEventTableFetchNextScheduledEvent, uuid)
 	res, err := getEventInfos(sctx, sql)
 	if err != nil {
 		return types.ZeroTime, errors.Trace(err)

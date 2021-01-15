@@ -1,4 +1,4 @@
-// Copyright 2020 PingCAP, Inc.
+// Copyright 2021 PingCAP, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -126,5 +126,5 @@ func claimTriggeredEvents(sctx sessionctx.Context, uuid string) error {
 }
 
 func findNextTriggerTime(sctx sessionctx.Context, uuid string) (types.Time, error) {
-	return event.FetchMostRecentEvent(sctx, uuid)
+	return event.FetchNextScheduledEvent(sctx, uuid)
 }
