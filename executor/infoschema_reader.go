@@ -882,7 +882,6 @@ func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []
 
 	tblRows, _, err := ctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(`SELECT event_schema_name, event_name, definer, time_zone, event_body_type, event_definition, 
 	event_type, execute_at, interval_value, INTERVAL_UINT AS interval_field, sql_mode, starts, ends, status, preserve, comment, originator, charset, collation FROM mysql.async_event`)
-	// ,  , ,
 	if err != nil {
 		return
 	}

@@ -41,6 +41,19 @@ const (
 	TypeSlaveSideDisabled
 )
 
+// ShowCreateString is for the string value in SHOW CREATE EVENT context.
+// It's very weird: it's different from in the table context.
+func (t EventEnableType) ShowCreateString() string {
+	switch t {
+	case TypeDisabled:
+		return "DISABLE"
+	case TypeSlaveSideDisabled:
+		return "DISABLE ON SLAVE"
+	default:
+		return "ENABLE"
+	}
+}
+
 func (t EventEnableType) String() string {
 	switch t {
 	//enum('ENABLED','DISABLED','SLAVESIDE_DISABLED')

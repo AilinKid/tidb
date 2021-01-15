@@ -38,6 +38,7 @@ import (
 	"github.com/pingcap/tidb/bindinfo"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/ddl"
+	"github.com/pingcap/tidb/ddl/event"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/infoschema"
@@ -133,6 +134,8 @@ func (e *ShowExec) fetchAll(ctx context.Context) error {
 		return e.fetchShowColumns(ctx)
 	case ast.ShowConfig:
 		return e.fetchShowClusterConfigs(ctx)
+	case ast.ShowCreateEvent:
+		return e.fetchShowCreateEvent()
 	case ast.ShowCreateTable:
 		return e.fetchShowCreateTable()
 	case ast.ShowCreateSequence:
@@ -1021,6 +1024,82 @@ func (e *ShowExec) fetchShowClusterConfigs(ctx context.Context) error {
 			row = append(row, item.GetString())
 		}
 		e.appendRow(row)
+	}
+	return nil
+}
+
+// ConstructResultOfShowCreateEvent is the SHOW CREATE output for an event.
+func ConstructResultOfShowCreateEvent(ctx sessionctx.Context, eventID int64, eventSchemaID int64, buf *bytes.Buffer) error {
+	event, err := event.GetFromID(ctx, eventID, eventSchemaID)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(buf, "CREATE DEFINER=")
+	fmt.Fprintf(buf, "`root`@`localhost` ") // TODO: definer is currently broken
+	fmt.Fprintf(buf, "EVENT ")
+
+	name := event.EventName.String()
+	fmt.Fprintf(buf, stringutil.Escape(name, ctx.GetSessionVars().SQLMode))
+
+	fmt.Fprintf(buf, " ON SCHEDULE ")
+
+	if event.EventType == "ONE TIME" {
+		fmt.Fprintf(buf, "AT '%s' ", event.ExecuteAt)
+	} else {
+		fmt.Fprintf(buf, "EVERY %s %s ", event.IntervalValue, event.IntervalUnit.String())
+
+		if true { // TODO: check if STARTS not null
+			fmt.Fprintf(buf, "STARTS '%s' ", event.Starts)
+		}
+
+		if true { // TODO: check if ENDS not null
+			fmt.Fprintf(buf, "ENDS '%s' ", event.Ends)
+		}
+
+	}
+
+	// On completion Attribute
+	fmt.Fprintf(buf, "ON COMPLETION ")
+	if !event.Preserve {
+		fmt.Fprintf(buf, "NOT ")
+	}
+	fmt.Fprintf(buf, "PRESERVE ")
+
+	// Enable / Disable status
+	fmt.Fprintf(buf, event.Enable.ShowCreateString())
+	// Statement / Expression
+	fmt.Fprintf(buf, " DO %s", event.Statement)
+
+	return nil
+}
+
+func (e *ShowExec) fetchShowCreateEvent() error {
+
+	tblRows, _, err := e.ctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(`SELECT event_id, event_schema_id, event_name, sql_mode, time_zone, charset, collation FROM mysql.async_event`)
+	if err != nil {
+		return err
+	}
+	for _, row := range tblRows {
+
+		// TODO: save sqlMode as string, so it is safe for when sql-modes are removed in future.
+		// Has happened in MySQL but not TiDB.
+		sqlMode := row.GetInt64(3)
+		sqlModeStr := strconv.FormatInt(sqlMode, 10)
+
+		var buf bytes.Buffer
+		ConstructResultOfShowCreateEvent(e.ctx, row.GetInt64(0), row.GetInt64(1), &buf)
+
+		record := []interface{}{
+			row.GetString(2), // EVENT_NAME
+			sqlModeStr,       // SQL Mode
+			row.GetString(4), // TIME ZONE
+			buf.String(),     // SHOW CREATE EVENT
+			row.GetString(5), // CHARSET CLIENT
+			row.GetString(6), // COLLATION CONNECTION
+			row.GetString(6), // DATABASE COLLATION
+		}
+		e.appendRow(record)
 	}
 	return nil
 }
