@@ -28,6 +28,7 @@ import (
 
 	"github.com/cznic/mathutil"
 	"github.com/pingcap/errors"
+	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/charset"
 	"github.com/pingcap/parser/model"
 	"github.com/pingcap/parser/mysql"
@@ -142,6 +143,8 @@ func (e *memtableRetriever) retrieve(ctx context.Context, sctx sessionctx.Contex
 			err = e.setDataForStatementsSummary(sctx, e.table.Name.O)
 		case infoschema.TablePlacementPolicy:
 			err = e.setDataForPlacementPolicy(sctx)
+		case infoschema.TableEvents:
+			e.setDataFromEvents(sctx, dbs)
 		}
 		if err != nil {
 			return nil, err
@@ -869,6 +872,63 @@ func (e *memtableRetriever) setDataFromIndexes(ctx sessionctx.Context, schemas [
 				}
 			}
 		}
+	}
+	e.rows = rows
+}
+
+func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []*model.DBInfo) {
+	checker := privilege.GetPrivilegeManager(ctx)
+	var rows [][]types.Datum
+
+	tblRows, _, err := ctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(`SELECT event_schema_name, event_name, definer, time_zone, event_body_type, event_definition, 
+	event_type, execute_at, interval_value, INTERVAL_UINT AS interval_field, sql_mode, starts, ends, status, preserve, comment, originator, charset, collation FROM mysql.async_event`)
+	// ,  , ,
+	if err != nil {
+		return
+	}
+	for _, row := range tblRows {
+
+		if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, row.GetString(0), row.GetString(1), "", mysql.AllPrivMask) {
+			continue
+		}
+
+		// TODO: save sqlMode as string, so it is safe for when sql-modes are removed in future.
+		// Has happened in MySQL but not TiDB.
+
+		sqlMode := row.GetInt64(10)
+		sqlModeStr := strconv.FormatInt(sqlMode, 10)
+		preserveStr := "NOT PRESERVE"
+		if row.GetInt64(14) == 1 {
+			preserveStr = "PRESERVE"
+		}
+
+		record := types.MakeDatums(
+			infoschema.CatalogVal, // EVENT_CATALOG
+			row.GetString(0),      // EVENT_SCHEMA
+			row.GetString(1),      // EVENT_NAME
+			row.GetString(2),      // DEFINER
+			row.GetString(3),      // TIME_ZONE
+			row.GetString(4),      // EVENT_BODY
+			row.GetString(5),      // EVENT_DEFINITION
+			row.GetString(6),      // EVENT_TYPE
+			row.GetTime(7),        // EXECUTE_AT
+			row.GetString(8),      // INTERVAL_VALUE
+			ast.TimeUnitType(row.GetUint64(9)).String(), // INTERVAL_FIELD
+			sqlModeStr,        // SQL_MODE
+			row.GetTime(11),   // STARTS
+			row.GetTime(12),   // ENDS
+			row.GetString(13), // STATUS
+			preserveStr,       // ON_COMPLETION
+			nil,               // CREATED
+			nil,               // LAST_ALTERED
+			nil,               // LAST_EXECUTED
+			row.GetString(15), // EVENT_COMMENT
+			row.GetInt64(16),  // ORIGINATOR
+			row.GetString(17), // CHARSET CLIENT
+			row.GetString(18), // COLLATION CONNECTION
+			row.GetString(18), // DATABASE COLLATION
+		)
+		rows = append(rows, record)
 	}
 	e.rows = rows
 }

@@ -87,7 +87,7 @@ const (
 	TableViews           = "VIEWS"
 	tableRoutines        = "ROUTINES"
 	tableParameters      = "PARAMETERS"
-	tableEvents          = "EVENTS"
+	TableEvents          = "EVENTS"
 	tableGlobalStatus    = "GLOBAL_STATUS"
 	tableGlobalVariables = "GLOBAL_VARIABLES"
 	tableSessionStatus   = "SESSION_STATUS"
@@ -183,7 +183,7 @@ var tableIDMap = map[string]int64{
 	TableViews:                              autoid.InformationSchemaDBID + 23,
 	tableRoutines:                           autoid.InformationSchemaDBID + 24,
 	tableParameters:                         autoid.InformationSchemaDBID + 25,
-	tableEvents:                             autoid.InformationSchemaDBID + 26,
+	TableEvents:                             autoid.InformationSchemaDBID + 26,
 	tableGlobalStatus:                       autoid.InformationSchemaDBID + 27,
 	tableGlobalVariables:                    autoid.InformationSchemaDBID + 28,
 	tableSessionStatus:                      autoid.InformationSchemaDBID + 29,
@@ -666,11 +666,11 @@ var tableEventsCols = []columnInfo{
 	{name: "CREATED", tp: mysql.TypeDatetime, flag: mysql.NotNullFlag, deflt: "0000-00-00 00:00:00"},
 	{name: "LAST_ALTERED", tp: mysql.TypeDatetime, flag: mysql.NotNullFlag, deflt: "0000-00-00 00:00:00"},
 	{name: "LAST_EXECUTED", tp: mysql.TypeDatetime},
-	{name: "EVENT_COMMENT", tp: mysql.TypeVarchar, size: 64, flag: mysql.NotNullFlag},
+	{name: "EVENT_COMMENT", tp: mysql.TypeVarchar, size: 2048, flag: mysql.NotNullFlag},
 	{name: "ORIGINATOR", tp: mysql.TypeLong, size: 10, flag: mysql.NotNullFlag, deflt: 0},
-	{name: "CHARACTER_SET_CLIENT", tp: mysql.TypeVarchar, size: 32, flag: mysql.NotNullFlag},
-	{name: "COLLATION_CONNECTION", tp: mysql.TypeVarchar, size: 32, flag: mysql.NotNullFlag},
-	{name: "DATABASE_COLLATION", tp: mysql.TypeVarchar, size: 32, flag: mysql.NotNullFlag},
+	{name: "CHARACTER_SET_CLIENT", tp: mysql.TypeVarchar, size: 64, flag: mysql.NotNullFlag},
+	{name: "COLLATION_CONNECTION", tp: mysql.TypeVarchar, size: 64, flag: mysql.NotNullFlag},
+	{name: "DATABASE_COLLATION", tp: mysql.TypeVarchar, size: 64, flag: mysql.NotNullFlag},
 }
 
 var tableGlobalStatusCols = []columnInfo{
@@ -1618,7 +1618,7 @@ var tableNameToColumns = map[string][]columnInfo{
 	TableViews:                              tableViewsCols,
 	tableRoutines:                           tableRoutinesCols,
 	tableParameters:                         tableParametersCols,
-	tableEvents:                             tableEventsCols,
+	TableEvents:                             tableEventsCols,
 	tableGlobalStatus:                       tableGlobalStatusCols,
 	tableGlobalVariables:                    tableGlobalVariablesCols,
 	tableSessionStatus:                      tableSessionStatusCols,
@@ -1704,7 +1704,6 @@ func (it *infoschemaTable) getRows(ctx sessionctx.Context, cols []*table.Column)
 	case tableTablePrivileges:
 	case tableColumnPrivileges:
 	case tableParameters:
-	case tableEvents:
 	case tableGlobalStatus:
 	case tableGlobalVariables:
 	case tableSessionStatus:
