@@ -133,16 +133,6 @@ func Claim(sctx sessionctx.Context, uuid string) (string, error) {
 	return targetEvent.Statement, nil
 }
 
-func sQLModeToString(m mysql.SQLMode) string {
-	var modes []string
-	for mString, mVal := range mysql.Str2SQLMode {
-		if m&mVal == mVal {
-			modes = append(modes, mString)
-		}
-	}
-	return strings.Join(modes, ",")
-}
-
 // Delete delete a eventInfo in physical system table.
 func Delete(e *model2.EventInfo, sctx sessionctx.Context) error {
 	sql := fmt.Sprintf(deleteEventTableByIDSQL, e.EventID, e.EventSchemaID)
@@ -173,7 +163,7 @@ func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 		return err
 	}
 	sql := fmt.Sprintf(insertEventTableSQL, e.EventID, e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
-		e.Definer.String(), sQLModeToString(e.SQLMode), e.TimeZone, e.BodyType, e.EventType, e.Statement,
+		e.Definer.String(), e.SQLMode.String(), e.TimeZone, e.BodyType, e.EventType, e.Statement,
 		e.ExecuteAt.String(), e.Starts.String(), e.Ends.String(), e.IntervalValue, e.IntervalUnit,
 		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.Collation, e.Comment, e.NextExecuteAt.String())
 

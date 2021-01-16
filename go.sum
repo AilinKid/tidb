@@ -465,6 +465,8 @@ github.com/kennytm/parser v0.0.0-20210113145215-e8a2a3e822b1 h1:HNW7RDtp2LQOC7KE
 github.com/kennytm/parser v0.0.0-20210113145215-e8a2a3e822b1/go.mod h1:GbEr2PgY72/4XqPZzmzstlOU/+il/wrjeTNFs6ihsSE=
 github.com/kennytm/parser v0.0.0-20210114071928-41f6467942d8 h1:3kNJnDL6eipJ6+GHJyFs3cB29t9PwFrGgVvTFGLnIVU=
 github.com/kennytm/parser v0.0.0-20210114071928-41f6467942d8/go.mod h1:GbEr2PgY72/4XqPZzmzstlOU/+il/wrjeTNFs6ihsSE=
+github.com/kennytm/parser v0.0.0-20210116020746-b9a98c5f3615 h1:epJ0k2QNeFbwsLH/RLEqZx/L7ryVWF+4w12CtJiyhsQ=
+github.com/kennytm/parser v0.0.0-20210116020746-b9a98c5f3615/go.mod h1:GbEr2PgY72/4XqPZzmzstlOU/+il/wrjeTNFs6ihsSE=
 github.com/kevinburke/go-bindata v3.18.0+incompatible/go.mod h1:/pEEZ72flUW2p0yi30bslSp9YqD9pysLxunQDdb2CPM=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
 github.com/kisielk/errcheck v1.2.0/go.mod h1:/BMXB+zMLi60iA8Vv6Ksmxu/1UDYcXs4uQLJ+jE2L00=
