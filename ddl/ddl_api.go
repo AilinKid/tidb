@@ -1841,9 +1841,6 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	if err != nil {
 		return errors.Trace(err)
 	}
-	// TODO: fix the parser, starts = ends has double meanings.
-	// TODO: For one-time scheduler, starts = ends is ok.
-	// TODO: For recursive scheduler, starts = ends is a error.
 	if s.Schedule.IntervalValue == nil {
 		eventInfo.EventType = "ONE TIME"
 		eventInfo.ExecuteAt = startTime.GetMysqlTime()
