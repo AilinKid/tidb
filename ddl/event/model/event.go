@@ -14,10 +14,6 @@
 package model
 
 import (
-	"math"
-	"strconv"
-	"time"
-
 	"github.com/pingcap/errors"
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/auth"
@@ -143,16 +139,12 @@ func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) error {
 		if e.NextExecuteAt.IsZero() {
 			e.NextExecuteAt = e.Starts
 		} else {
-			v, err := strconv.Atoi(e.IntervalValue)
+			// Since the IntervalValue is not always a integer, take '30:20' MINUTE_SECOND into consideration.
+			d, err := types.ExtractDurationValue(e.IntervalUnit.String(), e.IntervalValue)
 			if err != nil {
-				return errors.Trace(err)
+				return err
 			}
-			d, err := e.IntervalUnit.Duration()
-			if err != nil {
-				return errors.Trace(err)
-			}
-			duration := time.Duration(v) * d
-			next, err := e.NextExecuteAt.Add(sctx.GetSessionVars().StmtCtx, types.Duration{Duration: duration})
+			next, err := e.NextExecuteAt.Add(sctx.GetSessionVars().StmtCtx, d)
 			if err != nil {
 				return errors.Trace(err)
 			}
@@ -160,11 +152,4 @@ func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) error {
 		}
 	}
 	return nil
-}
-
-func ts2Time(timestamp uint64) types.Time {
-	duration := time.Duration(math.Pow10(9-int(types.DefaultFsp))) * time.Nanosecond
-	t := model.TSConvert2Time(timestamp)
-	t.Truncate(duration)
-	return types.NewTime(types.FromGoTime(t), mysql.TypeDatetime, types.DefaultFsp)
 }
