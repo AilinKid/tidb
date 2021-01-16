@@ -173,6 +173,7 @@ func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 	return errors.Trace(err)
 }
 
+// CheckExist checks if exists.
 func CheckExist(sctx sessionctx.Context, ident ast.Ident) (*model2.EventInfo, error) {
 	return GetFromName(sctx, ident.Name.L, ident.Schema.L)
 }
@@ -245,7 +246,14 @@ func DecodeRowIntoEventInfo(e *model2.EventInfo, r chunk.Row) *model2.EventInfo 
 
 	auths := strings.Split(r.GetString(4), "@")
 	e.Definer = &auth.UserIdentity{Username: auths[0], Hostname: auths[1]}
-	e.SQLMode, _ = mysql.GetSQLMode(r.GetString(5))
+	var err error
+	e.SQLMode, err = mysql.GetSQLMode(r.GetString(5))
+	if err != nil {
+		logutil.BgLogger().Info("[event] event SQL mode was invalid, restoring default SQL mode")
+		if e.SQLMode, err = mysql.GetSQLMode(mysql.DefaultSQLMode); err != nil {
+			logutil.BgLogger().Fatal("[event] failed to set SQL mode")
+		}
+	}
 	e.TimeZone = r.GetString(6)
 	e.BodyType = r.GetString(7)
 	e.EventType = r.GetString(8)

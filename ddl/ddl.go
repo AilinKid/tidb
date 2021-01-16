@@ -93,6 +93,7 @@ var (
 	// valid events to run in this TiDB instance.
 	EventDDLChangedChannel = make(chan struct{}, 10)
 
+	// EventSchedulerRunning returns if the eventscheduler is running.
 	EventSchedulerRunning atomic.Bool
 )
 

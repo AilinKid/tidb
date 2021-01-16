@@ -27,6 +27,7 @@ import (
 	"github.com/pingcap/tidb/util/sqlexec"
 )
 
+// Scheduler is the event scheduler
 type Scheduler struct {
 	ctx                    context.Context
 	uuid                   string
@@ -49,6 +50,7 @@ func (d *ddl) runEventScheduler(eventDDLChangedChannel <-chan struct{}) {
 	eventScheduler.Run()
 }
 
+// Run starts the event scheduler.
 func (s *Scheduler) Run() {
 	// Set the event scheduler running status, avoid blocking the eventDDLChangedChannel write channel.
 	EventSchedulerRunning.Store(true)

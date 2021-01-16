@@ -1030,7 +1030,7 @@ func (e *ShowExec) fetchShowClusterConfigs(ctx context.Context) error {
 }
 
 // ConstructResultOfShowCreateEvent is the SHOW CREATE output for an event.
-func ConstructResultOfShowCreateEvent(ctx sessionctx.Context, ev *model2.EventInfo, buf *bytes.Buffer) error {
+func ConstructResultOfShowCreateEvent(ctx sessionctx.Context, ev *model2.EventInfo, buf *bytes.Buffer) {
 
 	fmt.Fprintf(buf, "CREATE DEFINER=")
 	fmt.Fprintf(buf, "`root`@`localhost` ") // TODO: definer is currently broken
@@ -1068,7 +1068,6 @@ func ConstructResultOfShowCreateEvent(ctx sessionctx.Context, ev *model2.EventIn
 	// Statement / Expression
 	fmt.Fprintf(buf, " DO %s", ev.Statement)
 
-	return nil
 }
 
 func (e *ShowExec) fetchShowCreateEvent() error {
