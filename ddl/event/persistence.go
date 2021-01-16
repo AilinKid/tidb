@@ -163,7 +163,7 @@ func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 		return err
 	}
 	sql := fmt.Sprintf(insertEventTableSQL, e.EventID, e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
-		e.Definer.String(), e.SQLMode.String(), e.TimeZone, e.BodyType, e.EventType, e.Statement,
+		e.Definer, e.SQLMode.String(), e.TimeZone, e.BodyType, e.EventType, e.Statement,
 		e.ExecuteAt.String(), e.Starts.String(), e.Ends.String(), e.IntervalValue, e.IntervalUnit,
 		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.Collation, e.Comment, e.NextExecuteAt.String())
 

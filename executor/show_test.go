@@ -1223,3 +1223,11 @@ func (s *testSuite5) TestIssue19507(c *C) {
 			"t2|1|t2_c_b_index|1|c|A|0|<nil>|<nil>||BTREE|||YES|NULL",
 			"t2|1|t2_c_b_index|2|b|A|0|<nil>|<nil>|YES|BTREE|||YES|NULL"))
 }
+
+func (s *testSuite5) TestShowEvents(c *C) {
+	tk := testkit.NewTestKit(c, s.store)
+	tk.MustExec("use test")
+	tk.Se.Auth(&auth.UserIdentity{Username: "root", Hostname: "localhost", CurrentUser: true, AuthUsername: "root", AuthHostname: "%"}, nil, []byte("012345678901234567890"))
+	tk.MustExec("create event e on schedule at '2029-01-16 10:38:00' do do 1;")
+	tk.MustQuery("show events").Check(testutil.RowsWithSep("|", "test|e|Asia/Shanghai|root@%|ONE TIME|2029-01-16 10:38:00|||0000-00-00 00:00:00|0000-00-00 00:00:00|ENABLED|1|||"))
+}

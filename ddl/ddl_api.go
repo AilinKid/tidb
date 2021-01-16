@@ -31,6 +31,7 @@ import (
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
 	"github.com/pingcap/parser/ast"
+	"github.com/pingcap/parser/auth"
 	"github.com/pingcap/parser/charset"
 	"github.com/pingcap/parser/format"
 	"github.com/pingcap/parser/model"
@@ -1766,12 +1767,17 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	if err != nil {
 		return errors.Trace(err)
 	}
+	definer := s.Definer
+	if s.Definer.CurrentUser {
+		u := ctx.GetSessionVars().User
+		definer = &auth.UserIdentity{Username: u.AuthUsername, Hostname: u.AuthHostname}
+	}
 	eventInfo := &model2.EventInfo{
 		EventName:       ident.Name,
 		EventSchemaID:   schema.ID,
 		EventSchemaName: ident.Schema,
 
-		Definer:    s.Definer,
+		Definer:    definer,
 		SQLMode:    ctx.GetSessionVars().SQLMode,
 		TimeZone:   ctx.GetSessionVars().TimeZone.String(),
 		BodyType:   "SQL",
@@ -1806,24 +1812,39 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	eventInfo.Instance = instance
 
 	// build the scheduler.
-	startTime, err := expression.EvalAstExpr(ctx, s.Schedule.Starts)
+	var startTime types.Datum
+	var endTime types.Datum
+	if s.Schedule.Starts == nil {
+		startTime = types.NewTimeDatum(types.CurrentTime(mysql.TypeDatetime))
+	}
+	startTime, err = expression.EvalAstExpr(ctx, s.Schedule.Starts)
 	if err != nil {
 		return errors.Trace(err)
 	}
-	endTime, err := expression.EvalAstExpr(ctx, s.Schedule.Ends)
+	startTime, err = startTime.ConvertTo(ctx.GetSessionVars().StmtCtx, types.NewFieldType(mysql.TypeDatetime))
+	if err != nil {
+		return errors.Trace(err)
+	}
+	endTime, err = expression.EvalAstExpr(ctx, s.Schedule.Ends)
+	if err != nil {
+		return errors.Trace(err)
+	}
+	endTime, err = endTime.ConvertTo(ctx.GetSessionVars().StmtCtx, types.NewFieldType(mysql.TypeDatetime))
 	if err != nil {
 		return errors.Trace(err)
 	}
 	// TODO: fix the parser, starts = ends has double meanings.
 	// TODO: For one-time scheduler, starts = ends is ok.
 	// TODO: For recursive scheduler, starts = ends is a error.
-	if startTime.GetMysqlTime().Compare(endTime.GetMysqlTime()) == 1 {
-		return errors.Trace(ErrEventEndsBeforeStarts)
-	}
-	if startTime.GetMysqlTime().Compare(endTime.GetMysqlTime()) == 0 {
+
+	//if startTime.GetMysqlTime().Compare(endTime.GetMysqlTime()) == 0 {
+	if s.Schedule.IntervalValue == nil {
 		eventInfo.EventType = "ONE TIME"
 		eventInfo.ExecuteAt = startTime.GetMysqlTime()
 	} else {
+		if startTime.GetMysqlTime().Compare(endTime.GetMysqlTime()) == 1 {
+			return errors.Trace(ErrEventEndsBeforeStarts)
+		}
 		eventInfo.EventType = "RECURRING"
 		if s.Schedule.IntervalValue != nil {
 			interval, err := expression.EvalAstExpr(ctx, s.Schedule.IntervalValue)

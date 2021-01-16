@@ -39,6 +39,7 @@ import (
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/ddl"
 	"github.com/pingcap/tidb/ddl/event"
+	model2 "github.com/pingcap/tidb/ddl/event/model"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/infoschema"
@@ -179,6 +180,7 @@ func (e *ShowExec) fetchAll(ctx context.Context) error {
 	case ast.ShowProcessList:
 		return e.fetchShowProcessList()
 	case ast.ShowEvents:
+		return e.fetchEvents()
 		// empty result
 	case ast.ShowStatsMeta:
 		return e.fetchShowStatsMeta()
@@ -1699,6 +1701,52 @@ func (e *ShowExec) fillRegionsToChunk(regions []regionMeta) {
 func (e *ShowExec) fetchShowBuiltins() error {
 	for _, f := range expression.GetBuiltinList() {
 		e.appendRow([]interface{}{f})
+	}
+	return nil
+}
+
+func (e *ShowExec) fetchEvents() error {
+	checker := privilege.GetPrivilegeManager(e.ctx)
+	if checker != nil && e.ctx.GetSessionVars().User != nil {
+		if !checker.DBIsVisible(e.ctx.GetSessionVars().ActiveRoles, e.DBName.O) {
+			return e.dbAccessDenied()
+		}
+	}
+	if !e.is.SchemaExists(e.DBName) {
+		return ErrBadDB.GenWithStackByArgs(e.DBName)
+	}
+
+    sql := `SELECT * FROM mysql.async_event`
+	res, err := e.ctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
+	for _, rs := range res {
+		req := rs.NewChunk()
+		err = rs.Next(context.TODO(), req)
+		if err != nil {
+			return err
+		}
+		if req.NumRows() == 0 {
+			continue
+		}
+		it := chunk.NewIterator4Chunk(req)
+		for row := it.Begin(); row != it.End(); row = it.Next() {
+			event := event.DecodeRowIntoEventInfo(new(model2.EventInfo), row)
+			e.result.AppendString(0, e.DBName.L)
+			e.result.AppendString(1, event.EventName.L)
+			e.result.AppendString(2, event.TimeZone)
+			e.result.AppendString(3, event.Definer.String())
+			e.result.AppendString(4, event.EventType)
+			e.result.AppendTime(5, event.ExecuteAt)
+			e.result.AppendString(6, event.IntervalValue)
+			e.result.AppendString(7, event.IntervalUnit.String())
+			e.result.AppendTime(8, event.Starts)
+			e.result.AppendTime(9, event.Ends)
+			e.result.AppendString(10, event.Enable.String())
+			e.result.AppendInt64(11, event.Originator)
+			clientCharset, clientCollation := e.ctx.GetSessionVars().GetCharsetInfo()
+			e.result.AppendString(12, clientCharset)
+			e.result.AppendString(13, clientCollation)
+			e.result.AppendString(14, event.Collation)
+		}
 	}
 	return nil
 }
