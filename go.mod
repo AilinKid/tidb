@@ -15,7 +15,6 @@ require (
 	github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2
 	github.com/frankban/quicktest v1.11.1 // indirect
 	github.com/fsouza/fake-gcs-server v1.17.0 // indirect
-	github.com/go-playground/locales v0.13.0
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/gogo/protobuf v1.3.1
