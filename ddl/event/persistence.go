@@ -37,39 +37,40 @@ import (
 const (
 	insertEventTablePrefix = `INSERT IGNORE INTO mysql.async_event VALUES `
 
-	// EVENT_ID          |    bigint(20)
-	// EVENT_NAME        |    varchar(64)
-	// EVENT_SCHEMA_ID   |    bigint(20)
-	// EVENT_SCHEMA_NAME |    varchar(64)
+	// EVENT_ID             |    bigint(20)
+	// EVENT_NAME           |    varchar(64)
+	// EVENT_SCHEMA_ID      |    bigint(20)
+	// EVENT_SCHEMA_NAME    |    varchar(64)
 
-	// DEFINER           |    varchar(288)
-	// SQL_MODE          |    varchar(8192)
-	// TIME_ZONE         |    varchar(64)
-	// EVENT_BODY        |    varchar(3)
-	// EVENT_TYPE        |    varchar(9)
-	// EVENT_DEFINITION  |    longtext
+	// DEFINER              |    varchar(288)
+	// SQL_MODE             |    varchar(8192)
+	// TIME_ZONE            |    varchar(64)
+	// EVENT_BODY           |    varchar(3)
+	// EVENT_TYPE           |    varchar(9)
+	// EVENT_DEFINITION     |    longtext
 
-	// EXECUTE_AT        |    datetime
-	// STARTS            |    datetime
-	// ENDS              |    datetime
-	// INTERVAL_VALUE    |    varchar(256)
-	// INTERVAL_UNIT     |    bigint(20)
+	// EXECUTE_AT           |    datetime
+	// STARTS               |    datetime
+	// ENDS                 |    datetime
+	// INTERVAL_VALUE       |    varchar(256)
+	// INTERVAL_UNIT        |    bigint(20)
 
-	// STATUS            |    enum('ENABLED','DISABLED','SLAVESIDE_DISABLED')
-	// PRESERVE          |    boolean
-	// ORIGINATOR        |    bigint
-	// INSTANCE          |    varchar(64)
-	// CHARSET           |    varchar(64)
-	// COLLATION         |    varchar(64)
-	// COMMENT           |    varchar(2048)
+	// STATUS               |    enum('ENABLED','DISABLED','SLAVESIDE_DISABLED')
+	// PRESERVE             |    boolean
+	// ORIGINATOR           |    bigint
+	// INSTANCE             |    varchar(64)
+	// CHARSET              |    varchar(64)
+	// COLLATION_CONNECTION |    varchar(64)
+	// COLLATION_DATABASE   |    varchar(64)
+	// COMMENT              |    varchar(2048)
 
-	// NEXT_EXECUTE_AT   |    datetime
-	// CREATED           |    datetime
+	// NEXT_EXECUTE_AT      |    datetime
+	// CREATED              |    datetime
 
 	insertEventTableValue = `(%d, "%s", %d, "%s",
 		"%s", "%s", "%s", "%s", "%s", "%s",
 		"%s", "%s", "%s", "%s", "%d",
-		"%s", %t, %d, "%s", "%s", "%s", "%s", "%s", NOW())`
+		"%s", %t, %d, "%s", "%s", "%s","%s", "%s", "%s", NOW())`
 
 	insertEventTableSQL = insertEventTablePrefix + insertEventTableValue
 
@@ -165,7 +166,7 @@ func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 	sql := fmt.Sprintf(insertEventTableSQL, e.EventID, e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
 		e.Definer, e.SQLMode.String(), e.TimeZone, e.BodyType, e.EventType, e.Statement,
 		e.ExecuteAt.String(), e.Starts.String(), e.Ends.String(), e.IntervalValue, e.IntervalUnit,
-		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.Collation, e.Comment, e.NextExecuteAt.String())
+		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.CollationConnection, e.CollationDatabase, e.Comment, e.NextExecuteAt.String())
 
 	logutil.BgLogger().Info("[event] insert into event table", zap.Int64("eventID", e.EventID), zap.Int64("event schema ID", e.EventSchemaID))
 	_, err = sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
@@ -261,9 +262,10 @@ func DecodeRowIntoEventInfo(e *model2.EventInfo, r chunk.Row) *model2.EventInfo 
 	e.Originator = r.GetInt64(17)
 	e.Instance = r.GetString(18)
 	e.Charset = r.GetString(19)
-	e.Collation = r.GetString(20)
-	e.Comment = r.GetString(21)
+	e.CollationConnection = r.GetString(20)
+	e.CollationDatabase = r.GetString(21)
+	e.Comment = r.GetString(22)
 
-	e.NextExecuteAt = r.GetTime(22)
+	e.NextExecuteAt = r.GetTime(23)
 	return e
 }

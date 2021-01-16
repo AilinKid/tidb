@@ -1772,6 +1772,7 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		u := ctx.GetSessionVars().User
 		definer = &auth.UserIdentity{Username: u.AuthUsername, Hostname: u.AuthHostname}
 	}
+	charset, collation := ctx.GetSessionVars().GetCharsetInfo()
 	eventInfo := &model2.EventInfo{
 		EventName:       ident.Name,
 		EventSchemaID:   schema.ID,
@@ -1789,9 +1790,11 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		// TODO: server id now can not be used, fix it soon.
 		// TODO: server id variable is not used by TiDB now.
 		Originator: 1,
-		// TODO: charset & collation
 
-		Comment: s.Comment,
+		Charset:             charset,
+		CollationConnection: collation, // TODO: differentiate these two collations
+		CollationDatabase:   collation,
+		Comment:             s.Comment,
 	}
 
 	// assign the event ID.
@@ -1836,8 +1839,6 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	// TODO: fix the parser, starts = ends has double meanings.
 	// TODO: For one-time scheduler, starts = ends is ok.
 	// TODO: For recursive scheduler, starts = ends is a error.
-
-	//if startTime.GetMysqlTime().Compare(endTime.GetMysqlTime()) == 0 {
 	if s.Schedule.IntervalValue == nil {
 		eventInfo.EventType = "ONE TIME"
 		eventInfo.ExecuteAt = startTime.GetMysqlTime()
@@ -1846,13 +1847,13 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 			return errors.Trace(ErrEventEndsBeforeStarts)
 		}
 		eventInfo.EventType = "RECURRING"
-		if s.Schedule.IntervalValue != nil {
-			interval, err := expression.EvalAstExpr(ctx, s.Schedule.IntervalValue)
-			if err != nil {
-				return errors.Trace(err)
-			}
-			// interval can't be evaluated as a string directly.
-			eventInfo.IntervalValue = strconv.FormatInt(interval.GetInt64(), 10)
+		interval, err := expression.EvalAstExpr(ctx, s.Schedule.IntervalValue)
+		if err != nil {
+			return errors.Trace(err)
+		}
+		eventInfo.IntervalValue, err = interval.ToString()
+		if err != nil {
+			return errors.Trace(err)
 		}
 		if s.Schedule.IntervalUnit != ast.TimeUnitInvalid {
 			eventInfo.IntervalUnit = s.Schedule.IntervalUnit

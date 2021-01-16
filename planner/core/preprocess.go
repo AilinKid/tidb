@@ -25,6 +25,7 @@ import (
 	"github.com/pingcap/parser/model"
 	"github.com/pingcap/parser/mysql"
 	"github.com/pingcap/tidb/ddl"
+	"github.com/pingcap/tidb/ddl/event"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/meta/autoid"
@@ -106,6 +107,8 @@ const (
 	// inSequenceFunction is set when visiting a sequence function.
 	// This flag indicates the tableName in these function should be checked as sequence object.
 	inSequenceFunction
+	//  inShowEvent is set when visiting a event via table name.
+	inShowEvent
 )
 
 // preprocessor is an ast.Visitor that preprocess
@@ -168,6 +171,9 @@ func (p *preprocessor) Enter(in ast.Node) (out ast.Node, skipChildren bool) {
 		p.checkDropDatabaseGrammar(node)
 	case *ast.ShowStmt:
 		p.stmtTp = TypeShow
+		if node.Tp == ast.ShowCreateEvent {
+			p.flag |= inShowEvent
+		}
 		p.resolveShowStmt(node)
 	case *ast.SetOprSelectList:
 		p.checkSetOprSelectList(node)
@@ -1131,6 +1137,11 @@ func (p *preprocessor) handleTableName(tn *ast.TableName) {
 		return
 	}
 
+	if p.flag&inShowEvent > 0 {
+		p.handleEventName(tn)
+		return
+	}
+
 	table, err := p.is.TableByName(tn.Schema, tn.Name)
 	if err != nil {
 		// We should never leak that the table doesn't exist (i.e. attach ErrTableNotExists)
@@ -1172,6 +1183,27 @@ func (p *preprocessor) checkNotInRepair(tn *ast.TableName) {
 	}
 	if tableInfo != nil {
 		p.err = ddl.ErrWrongTableName.GenWithStackByArgs(tn.Name.L, "this table is in repair")
+	}
+}
+
+func (p *preprocessor) handleEventName(tn *ast.TableName) {
+	_, ok := p.is.SchemaByName(tn.Schema)
+	if !ok {
+		p.err = infoschema.ErrDatabaseNotExists.GenWithStackByArgs(tn.Schema)
+		return
+	}
+	// Since the event is not stored as tableInfo, we should check the system table event's record.
+	ident := ast.Ident{
+		Schema: tn.Schema,
+		Name:   tn.Name,
+	}
+	eventInfo, err := event.CheckExist(p.ctx, ident)
+	if err != nil {
+		p.err = err
+		return
+	}
+	if eventInfo == nil {
+		p.err = infoschema.ErrEventNotExists.GenWithStackByArgs(ident)
 	}
 }
 
