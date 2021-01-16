@@ -450,7 +450,7 @@ var defaultSysVars = []*SysVar{
 		if strings.EqualFold(normalizedValue, "SYSTEM") {
 			return "SYSTEM", nil
 		}
-		_, err := parseTimeZone(normalizedValue)
+		_, err := ParseTimeZone(normalizedValue)
 		return normalizedValue, err
 	}},
 	{Scope: ScopeNone, Name: SystemTimeZone, Value: "CST"},

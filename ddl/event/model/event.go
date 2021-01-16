@@ -16,12 +16,13 @@ package model
 import (
 	"time"
 
-	"github.com/juju/errors"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/auth"
 	"github.com/pingcap/parser/model"
 	"github.com/pingcap/parser/mysql"
 	"github.com/pingcap/tidb/sessionctx"
+	"github.com/pingcap/tidb/sessionctx/variable"
 	"github.com/pingcap/tidb/types"
 )
 
@@ -175,4 +176,15 @@ func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) (bool, er
 		}
 	}
 	return false, nil
+}
+
+func (e *EventInfo) ConvertTimezone() error {
+	timezone, err := variable.ParseTimeZone(e.TimeZone)
+	if err != nil {
+		return err
+	}
+	e.ExecuteAt.ConvertTimeZone(time.UTC, timezone)
+	e.Starts.ConvertTimeZone(time.UTC, timezone)
+	e.Ends.ConvertTimeZone(time.UTC, timezone)
+	return nil
 }

@@ -1324,7 +1324,7 @@ func (s *SessionVars) SetSystemVar(name string, val string) error {
 		s.txnIsolationLevelOneShot.state = oneShotSet
 		s.txnIsolationLevelOneShot.value = val
 	case TimeZone:
-		tz, err := parseTimeZone(val)
+		tz, err := ParseTimeZone(val)
 		if err != nil {
 			return err
 		}

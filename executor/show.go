@@ -1057,10 +1057,11 @@ func (e *ShowExec) fetchShowCreateEvent() error {
 	}
 	var buf bytes.Buffer
 	ConstructResultOfShowCreateEvent(e.ctx, ev, &buf)
+	ev.ConvertTimezone()
 	record := []interface{}{
 		ev.EventName.String(),
 		ev.SQLMode.String(),
-		ev.TimeZone,
+		e.ctx.GetSessionVars().TimeZone,
 		buf.String(),
 		ev.Charset,
 		ev.CollationConnection,
@@ -1702,6 +1703,8 @@ func (e *ShowExec) fetchEvents() error {
 		it := chunk.NewIterator4Chunk(req)
 		for row := it.Begin(); row != it.End(); row = it.Next() {
 			event := event.DecodeRowIntoEventInfo(new(model2.EventInfo), row)
+			event.ConvertTimezone()
+			fmt.Printf("event timezone %s\n", event.TimeZone)
 			e.result.AppendString(0, e.DBName.L)
 			e.result.AppendString(1, event.EventName.L)
 			e.result.AppendString(2, event.TimeZone)

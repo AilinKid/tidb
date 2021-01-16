@@ -923,6 +923,16 @@ func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []
 			preserveStr = "PRESERVE"
 		}
 
+		timezone, err := variable.ParseTimeZone(row.GetString(3))
+		if err != nil {
+			return
+		}
+		executeAt := row.GetTime(7)
+		executeAt.ConvertTimeZone(time.UTC, timezone)
+		starts := row.GetTime(11)
+		starts.ConvertTimeZone(time.UTC, timezone)
+		ends := row.GetTime(12)
+		ends.ConvertTimeZone(time.UTC, timezone)
 		record := types.MakeDatums(
 			infoschema.CatalogVal, // EVENT_CATALOG
 			row.GetString(0),      // EVENT_SCHEMA
@@ -932,12 +942,12 @@ func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []
 			row.GetString(4),      // EVENT_BODY
 			row.GetString(5),      // EVENT_DEFINITION
 			row.GetString(6),      // EVENT_TYPE
-			row.GetTime(7),        // EXECUTE_AT
+			executeAt,             // EXECUTE_AT
 			row.GetString(8),      // INTERVAL_VALUE
 			ast.TimeUnitType(row.GetUint64(9)).String(), // INTERVAL_FIELD
 			row.GetString(10), // SQL_MODE
-			row.GetTime(11),   // STARTS
-			row.GetTime(12),   // ENDS
+			starts,            // STARTS
+			ends,              // ENDS
 			row.GetString(13), // STATUS
 			preserveStr,       // ON_COMPLETION
 			row.GetTime(20),   // CREATED
