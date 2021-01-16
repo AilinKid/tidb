@@ -169,14 +169,16 @@ func RunSQL(ctx context.Context, sctx SQLExecutor, sql string, internal bool, re
 		return
 	}
 
-	recordSet := recordSets[0]
-	chk := recordSets[0].NewChunk()
-	for {
-		err = recordSet.Next(ctx, chk)
-		if err != nil || chk.NumRows() == 0 {
-			break
+	if len(recordSets) > 0 {
+		recordSet := recordSets[0]
+		chk := recordSets[0].NewChunk()
+		for {
+			err = recordSet.Next(ctx, chk)
+			if err != nil || chk.NumRows() == 0 {
+				break
+			}
 		}
+		terror.Call(recordSets[0].Close)
 	}
-	terror.Call(recordSets[0].Close)
 	resultChan <- err
 }

@@ -14,8 +14,6 @@
 package ddl
 
 import (
-	"fmt"
-
 	"github.com/pingcap/errors"
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/model"
@@ -48,19 +46,16 @@ func (w *worker) onCreateEvent(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int
 	}
 
 	// Double check event existence.
-	fmt.Println("get1")
 	sctx, err := w.sessPool.get()
 	if err != nil {
 		return ver, errors.Trace(err)
 	}
-	fmt.Println("get2")
 	defer w.sessPool.put(sctx)
 	old, err := event.CheckExist(sctx, ast.Ident{Schema: eventInfo.EventSchemaName, Name: eventInfo.EventName})
 	if err != nil {
 		// Wait for retry.
 		return ver, errors.Trace(err)
 	}
-	fmt.Println("check1")
 	if old != nil {
 		job.State = model.JobStateCancelled
 		return ver, errors.Trace(infoschema.ErrEventExists.GenWithStackByArgs(eventInfo.EventName))
@@ -70,7 +65,6 @@ func (w *worker) onCreateEvent(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int
 	if err != nil {
 		return ver, errors.Trace(err)
 	}
-	fmt.Println("insert1")
 	ver, err = updateSchemaVersion(t, job)
 	if err != nil {
 		// Since t and sctx is in two different txn, so it should clean the inserted event here.
@@ -111,7 +105,6 @@ func (w *worker) onDropEvent(t *meta.Meta, job *model.Job) (ver int64, _ error) 
 	// Finish this job.
 	job.FinishTableJob(model.JobStateDone, model.StatePublic, ver, nil)
 	return ver, nil
-
 }
 
 func (w *worker) onAlterEvent(t *meta.Meta, job *model.Job) (ver int64, _ error) {
