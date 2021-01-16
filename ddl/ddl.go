@@ -21,7 +21,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/uber-go/atomic"
 	"sync"
 	"time"
 
@@ -47,6 +46,7 @@ import (
 	"github.com/pingcap/tidb/table"
 	goutil "github.com/pingcap/tidb/util"
 	"github.com/pingcap/tidb/util/logutil"
+	"github.com/uber-go/atomic"
 	"go.uber.org/zap"
 )
 
