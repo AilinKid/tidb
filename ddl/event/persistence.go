@@ -53,7 +53,7 @@ const (
 	// STARTS            |    datetime
 	// ENDS              |    datetime
 	// INTERVAL_VALUE    |    varchar(256)
-	// INTERVAL_UINT     |    bigint(20)
+	// INTERVAL_UNIT     |    bigint(20)
 
 	// STATUS            |    enum('ENABLED','DISABLED','SLAVESIDE_DISABLED')
 	// PRESERVE          |    boolean

@@ -339,7 +339,7 @@ const (
 		STARTS datetime,
 		ENDS datetime,
 		INTERVAL_VALUE varchar(256),
-		INTERVAL_UINT bigint,
+		INTERVAL_UNIT bigint,
 
 		STATUS enum('ENABLED','DISABLED','SLAVESIDE_DISABLED'),
 		PRESERVE boolean,
