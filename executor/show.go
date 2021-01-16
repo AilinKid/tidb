@@ -1032,43 +1032,19 @@ func (e *ShowExec) fetchShowClusterConfigs(ctx context.Context) error {
 
 // ConstructResultOfShowCreateEvent is the SHOW CREATE output for an event.
 func ConstructResultOfShowCreateEvent(ctx sessionctx.Context, ev *model2.EventInfo, buf *bytes.Buffer) {
-
-	fmt.Fprintf(buf, "CREATE DEFINER=")
-	fmt.Fprintf(buf, "`root`@`localhost` ") // TODO: definer is currently broken
-	fmt.Fprintf(buf, "EVENT ")
-
 	name := ev.EventName.String()
-	fmt.Fprintf(buf, stringutil.Escape(name, ctx.GetSessionVars().SQLMode))
-
-	fmt.Fprintf(buf, " ON SCHEDULE ")
-
+	fmt.Fprintf(buf, "CREATE DEFINER=%s EVENT %s ON SCHEDULE ", ev.Definer.String(), stringutil.Escape(name, ctx.GetSessionVars().SQLMode))
 	if ev.EventType == "ONE TIME" {
 		fmt.Fprintf(buf, "AT '%s' ", ev.ExecuteAt)
 	} else {
-		fmt.Fprintf(buf, "EVERY %s %s ", ev.IntervalValue, ev.IntervalUnit.String())
-
-		if true { // TODO: check if STARTS not null
-			fmt.Fprintf(buf, "STARTS '%s' ", ev.Starts)
-		}
-
-		if true { // TODO: check if ENDS not null
-			fmt.Fprintf(buf, "ENDS '%s' ", ev.Ends)
-		}
-
+		fmt.Fprintf(buf, "EVERY %s %s STARTS '%s' ENDS '%s' ", ev.IntervalValue, ev.IntervalUnit.String(), ev.Starts, ev.Ends)
 	}
-
 	// On completion Attribute
 	fmt.Fprintf(buf, "ON COMPLETION ")
 	if !ev.Preserve {
 		fmt.Fprintf(buf, "NOT ")
 	}
-	fmt.Fprintf(buf, "PRESERVE ")
-
-	// Enable / Disable status
-	fmt.Fprintf(buf, ev.Enable.ShowCreateString())
-	// Statement / Expression
-	fmt.Fprintf(buf, " DO %s", ev.Statement)
-
+	fmt.Fprintf(buf, "PRESERVE %s DO %s", ev.Enable.ShowCreateString(), ev.Statement)
 }
 
 func (e *ShowExec) fetchShowCreateEvent() error {
@@ -1709,8 +1685,11 @@ func (e *ShowExec) fetchEvents() error {
 		return ErrBadDB.GenWithStackByArgs(e.DBName)
 	}
 
-    sql := `SELECT * FROM mysql.async_event`
+	sql := `SELECT * FROM mysql.async_event`
 	res, err := e.ctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
+	if err != nil {
+		return err
+	}
 	for _, rs := range res {
 		req := rs.NewChunk()
 		err = rs.Next(context.TODO(), req)
