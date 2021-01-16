@@ -19,11 +19,12 @@ import (
 
 	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/ddl/event"
-	"github.com/pingcap/tidb/kv"
+	"github.com/pingcap/tidb/errno"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/logutil"
 	"github.com/pingcap/tidb/util/sqlexec"
+	"go.uber.org/zap"
 )
 
 // Scheduler is the event scheduler
@@ -79,20 +80,20 @@ func (s *Scheduler) Run() {
 		nextTriggerTime = time.Now().Add(24 * time.Hour)
 		err = claimTriggeredEvents(sctx, s.uuid)
 		if err != nil {
-			logutil.BgLogger().Info("[event] claim event from system table fail")
+			logutil.BgLogger().Info("[event] claim event from system table fail", zap.Error(err))
 			return
 		}
 
 		// Set the next trigger time.
 		nextTime, err := findNextTriggerTime(sctx, s.uuid)
 		if err != nil {
-			logutil.BgLogger().Info("[event] fetch most recent event from system table fail")
+			logutil.BgLogger().Info("[event] fetch most recent event from system table fail", zap.Error(err))
 			return
 		}
 		if !nextTime.IsZero() {
 			nextTriggerTime, err = nextTime.GoTime(time.UTC)
 			if err != nil {
-				logutil.BgLogger().Info("[event] fetch most recent event from system table fail")
+				logutil.BgLogger().Info("[event] fetch most recent event from system table fail", zap.Error(err))
 				return
 			}
 		}
@@ -104,12 +105,17 @@ func claimTriggeredEvents(sctx sessionctx.Context, uuid string) error {
 	for {
 		ev, err := event.Claim(sctx, uuid)
 		if err != nil {
-			if kv.ErrTxnRetryable.Equal(err) || kv.ErrWriteConflict.Equal(err) || kv.ErrWriteConflictInTiDB.Equal(err) {
-				// the claimed event is done by other TiDB node, retry to fetch other triggered events.
-				continue
+			if terror, ok := errors.Cause(err).(*errors.Error); ok {
+				// can't use `session.ErrForUpdateCantRetry.Equal()` due to import cycle.
+				switch terror.Code() {
+				case errno.ErrTxnRetryable, errno.ErrWriteConflict, errno.ErrWriteConflictInTiDB, errno.ErrForUpdateCantRetry:
+					// the claimed event is done by other TiDB node, retry to fetch other triggered events.
+					continue
+				}
 			}
 			return errors.Trace(err)
 		}
+
 		if ev == nil {
 			// There is no valid triggered events.
 			return nil

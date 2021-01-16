@@ -413,6 +413,12 @@ func (do *Domain) Reload() error {
 		logutil.BgLogger().Warn("loading schema takes a long time", zap.Duration("take time", sub))
 	}
 
+	// kickstart the event scheduler.
+	select {
+	case ddl.EventDDLChangedChannel <- struct{}{}:
+	default:
+	}
+
 	return nil
 }
 
