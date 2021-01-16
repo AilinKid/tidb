@@ -1819,10 +1819,11 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	var endTime types.Datum
 	if s.Schedule.Starts == nil {
 		startTime = types.NewTimeDatum(types.CurrentTime(mysql.TypeDatetime))
-	}
-	startTime, err = expression.EvalAstExpr(ctx, s.Schedule.Starts)
-	if err != nil {
-		return errors.Trace(err)
+	} else {
+		startTime, err = expression.EvalAstExpr(ctx, s.Schedule.Starts)
+		if err != nil {
+			return errors.Trace(err)
+		}
 	}
 	startTime, err = startTime.ConvertTo(ctx.GetSessionVars().StmtCtx, types.NewFieldType(mysql.TypeDatetime))
 	if err != nil {
@@ -1830,10 +1831,11 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	}
 	if s.Schedule.Ends == nil {
 		endTime = types.GetMaxValue(types.NewFieldType(mysql.TypeDatetime))
-	}
-	endTime, err = expression.EvalAstExpr(ctx, s.Schedule.Ends)
-	if err != nil {
-		return errors.Trace(err)
+	} else {
+		endTime, err = expression.EvalAstExpr(ctx, s.Schedule.Ends)
+		if err != nil {
+			return errors.Trace(err)
+		}
 	}
 	endTime, err = endTime.ConvertTo(ctx.GetSessionVars().StmtCtx, types.NewFieldType(mysql.TypeDatetime))
 	if err != nil {
