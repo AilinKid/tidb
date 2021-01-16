@@ -1833,8 +1833,10 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 			if err != nil {
 				return errors.Trace(err)
 			}
-			// interval can't be evaluated as a string directly.
-			eventInfo.IntervalValue = strconv.FormatInt(interval.GetInt64(), 10)
+			eventInfo.IntervalValue, err = interval.ToString()
+			if err != nil {
+				return errors.Trace(err)
+			}
 		}
 		if s.Schedule.IntervalUnit != ast.TimeUnitInvalid {
 			eventInfo.IntervalUnit = s.Schedule.IntervalUnit
