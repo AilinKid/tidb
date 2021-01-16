@@ -145,14 +145,21 @@ func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) (bool, er
 		if e.NextExecuteAt.IsZero() {
 			e.NextExecuteAt = e.Starts
 		} else {
-			// Since the IntervalValue is not always a integer, take '30:20' MINUTE_SECOND into consideration.
-			if e.Ends.Compare(types.CurrentTime(mysql.TypeDatetime)) <= 0 {
+			// Check whether the recursive event is over, use the UTC current time here.
+			utcNow := types.CurrentTime(mysql.TypeDatetime)
+			err := utcNow.ConvertTimeZone(time.Local, time.UTC)
+			if err != nil {
+				return false, errors.Trace(err)
+			}
+			// UTC compare.
+			if e.Ends.Compare(utcNow) <= 0 {
 				if !e.Preserve {
 					return true, nil
 				}
 				e.Enable = TypeDisabled
 				return false, nil
 			}
+			// Since the IntervalValue is not always a integer, take '30:20' MINUTE_SECOND into consideration.
 			years, months, days, nanos, err := types.ParseDurationValue(e.IntervalUnit.String(), e.IntervalValue)
 			if err != nil {
 				return false, err
@@ -167,11 +174,6 @@ func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) (bool, er
 			goTime = types.AddDate(years, months, days, goTime)
 
 			e.NextExecuteAt.SetCoreTime(types.FromGoTime(goTime))
-			// next, err := e.NextExecuteAt.Add(sctx.GetSessionVars().StmtCtx, d)
-			// if err != nil {
-			// 	return errors.Trace(err)
-			// }
-			// e.NextExecuteAt = next
 		}
 	}
 	return false, nil
@@ -183,10 +185,12 @@ func (e *EventInfo) ConvertTimezone() error {
 	if err != nil {
 		return err
 	}
-	if err := e.ExecuteAt.ConvertTimeZone(time.UTC, timezone); err != nil {
+	err = e.ExecuteAt.ConvertTimeZone(time.UTC, timezone)
+	if err != nil {
 		return err
 	}
-	if err := e.Starts.ConvertTimeZone(time.UTC, timezone); err != nil {
+	err = e.Starts.ConvertTimeZone(time.UTC, timezone)
+	if err != nil {
 		return err
 	}
 	return e.Ends.ConvertTimeZone(time.UTC, timezone)

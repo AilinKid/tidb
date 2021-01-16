@@ -1775,7 +1775,11 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		definer = &auth.UserIdentity{Username: u.AuthUsername, Hostname: u.AuthHostname}
 	}
 	charset, collation := vars.GetCharsetInfo()
-	timeZone, _ := vars.GetSystemVar("time_zone") // vars.TimeZone.String() is empty for fixed tz like '+08:00'.
+	// vars.TimeZone.String() may be empty for fixed tz like '+08:00'.
+	// vars.GetSystemVar("time_zone") may get SYSTEM timezone.
+	// So use vars.Location() here.
+	localTZ := vars.Location()
+
 	eventInfo := &model2.EventInfo{
 		EventName:       ident.Name,
 		EventSchemaID:   schema.ID,
@@ -1783,7 +1787,7 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 
 		Definer:    definer,
 		SQLMode:    vars.SQLMode,
-		TimeZone:   timeZone,
+		TimeZone:   localTZ.String(),
 		BodyType:   "SQL",
 		Statement:  sb.String(),
 		SecureStmt: sb.String(),
@@ -1846,8 +1850,6 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		return errors.Trace(err)
 	}
 
-	localTZ := vars.Location()
-
 	if s.Schedule.IntervalValue == nil {
 		eventInfo.EventType = "ONE TIME"
 		eventInfo.ExecuteAt = startTime.GetMysqlTime()
@@ -1881,7 +1883,7 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		case years == 0 && months == 0 && days > 0:
 		case years == 0 && months == 0 && days == 0 && nanos >= 1_000_000_000:
 		default:
-			// TODO: what duration is to big?
+			// TODO: what duration is too big?
 			// TODO: scheduling events with < 1s seems to cause events to be scheduled at 0s interval, this should be fixed.
 			return errors.Trace(ErrEventIntervalNotPositiveOrTooBig)
 		}
