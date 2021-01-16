@@ -14,7 +14,9 @@
 package model
 
 import (
-	"github.com/pingcap/errors"
+	"time"
+
+	"github.com/juju/errors"
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/auth"
 	"github.com/pingcap/parser/model"
@@ -151,15 +153,25 @@ func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) (bool, er
 					return false, nil
 				}
 			}
-			d, err := types.ExtractDurationValue(e.IntervalUnit.String(), e.IntervalValue)
+			years, months, days, nanos, err := types.ParseDurationValue(e.IntervalUnit.String(), e.IntervalValue)
 			if err != nil {
 				return false, err
 			}
-			next, err := e.NextExecuteAt.Add(sctx.GetSessionVars().StmtCtx, d)
+
+			// this is copied from (*baseDateArithmitical).addDate
+			goTime, err := e.NextExecuteAt.GoTime(time.UTC)
 			if err != nil {
 				return false, errors.Trace(err)
 			}
-			e.NextExecuteAt = next
+			goTime = goTime.Add(time.Duration(nanos))
+			goTime = types.AddDate(years, months, days, goTime)
+
+			e.NextExecuteAt.SetCoreTime(types.FromGoTime(goTime))
+			// next, err := e.NextExecuteAt.Add(sctx.GetSessionVars().StmtCtx, d)
+			// if err != nil {
+			// 	return errors.Trace(err)
+			// }
+			// e.NextExecuteAt = next
 		}
 	}
 	return false, nil

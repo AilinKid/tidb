@@ -1773,6 +1773,7 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		definer = &auth.UserIdentity{Username: u.AuthUsername, Hostname: u.AuthHostname}
 	}
 	charset, collation := ctx.GetSessionVars().GetCharsetInfo()
+	timeZone, _ := ctx.GetSessionVars().GetSystemVar("time_zone")
 	eventInfo := &model2.EventInfo{
 		EventName:       ident.Name,
 		EventSchemaID:   schema.ID,
@@ -1780,7 +1781,7 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 
 		Definer:    definer,
 		SQLMode:    ctx.GetSessionVars().SQLMode,
-		TimeZone:   ctx.GetSessionVars().TimeZone.String(),
+		TimeZone:   timeZone,
 		BodyType:   "SQL",
 		Statement:  sb.String(),
 		SecureStmt: sb.String(),
@@ -1860,14 +1861,21 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		if s.Schedule.IntervalUnit != ast.TimeUnitInvalid {
 			eventInfo.IntervalUnit = s.Schedule.IntervalUnit
 		}
-		duration, err := types.ExtractDurationValue(eventInfo.IntervalUnit.String(), eventInfo.IntervalValue)
+
+		years, months, days, nanos, err := types.ParseDurationValue(eventInfo.IntervalUnit.String(), eventInfo.IntervalValue)
 		if err != nil {
-			return err
+			return errors.Trace(err)
 		}
-		if duration.Compare(types.ZeroDuration) != 1 {
+		switch {
+		case years > 0:
+		case years == 0 && months > 0:
+		case years == 0 && months == 0 && days > 0:
+		case years == 0 && months == 0 && days == 0 && nanos > 0:
+		default:
 			// TODO: what duration is to big?
-			return ErrEventIntervalNotPositiveOrTooBig.GenWithStackByArgs()
+			return errors.Trace(ErrEventIntervalNotPositiveOrTooBig)
 		}
+
 		eventInfo.Starts = startTime.GetMysqlTime()
 		eventInfo.Ends = endTime.GetMysqlTime()
 	}
