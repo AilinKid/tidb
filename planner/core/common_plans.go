@@ -72,6 +72,11 @@ type ShowNextRowID struct {
 	TableName *ast.TableName
 }
 
+// ShoEvent is for showing the events.
+type ShowEvent struct {
+	baseSchemaProducer
+}
+
 // CheckTable is used for checking table data, built from the 'admin check table' statement.
 type CheckTable struct {
 	baseSchemaProducer

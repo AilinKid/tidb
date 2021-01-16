@@ -1718,6 +1718,8 @@ func (e *ShowExec) fetchEvents() error {
 			e.result.AppendString(12, clientCharset)
 			e.result.AppendString(13, event.CollationConnection)
 			e.result.AppendString(14, event.CollationDatabase)
+			e.result.AppendEnum(15, event.LastExecuteResult)
+			e.result.AppendString(16, event.LastExecuteError)
 		}
 	}
 	return nil

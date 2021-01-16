@@ -28,6 +28,7 @@ import (
 	"github.com/pingcap/parser/model"
 	"github.com/pingcap/parser/mysql"
 	"github.com/pingcap/parser/opcode"
+
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/ddl"
 	"github.com/pingcap/tidb/domain"
@@ -3537,7 +3538,7 @@ func buildShowTriggerSchema() (*expression.Schema, []*types.FieldName) {
 
 func buildShowEventsSchema() (*expression.Schema, []*types.FieldName) {
 	tblName := "EVENTS"
-	schema := newColumnsWithNames(15)
+	schema := newColumnsWithNames(17)
 	schema.Append(buildColumnWithName(tblName, "Db", mysql.TypeVarchar, 128))
 	schema.Append(buildColumnWithName(tblName, "Name", mysql.TypeVarchar, 128))
 	schema.Append(buildColumnWithName(tblName, "Time zone", mysql.TypeVarchar, 32))
@@ -3553,6 +3554,8 @@ func buildShowEventsSchema() (*expression.Schema, []*types.FieldName) {
 	schema.Append(buildColumnWithName(tblName, "character_set_client", mysql.TypeVarchar, 32))
 	schema.Append(buildColumnWithName(tblName, "collation_connection", mysql.TypeVarchar, 32))
 	schema.Append(buildColumnWithName(tblName, "Database Collation", mysql.TypeVarchar, 32))
+	schema.Append(buildColumnWithName(tblName, "Last Execute Result", mysql.TypeVarchar, 32))
+	schema.Append(buildColumnWithName(tblName, "Last Execute Error", mysql.TypeVarchar, 32))
 	return schema.col2Schema(), schema.names
 }
 

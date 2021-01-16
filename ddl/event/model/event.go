@@ -123,6 +123,8 @@ type EventInfo struct {
 	CollationConnection string
 	CollationDatabase   string
 	Comment             string
+	LastExecuteResult   types.Enum
+	LastExecuteError    string
 	// Computed next execute time.
 	NextExecuteAt types.Time
 }

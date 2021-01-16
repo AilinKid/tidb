@@ -320,5 +320,7 @@ func DecodeRowIntoEventInfo(e *model2.EventInfo, r chunk.Row) *model2.EventInfo 
 	e.Comment = r.GetString(22)
 
 	e.NextExecuteAt = r.GetTime(23)
+	e.LastExecuteResult = r.GetEnum(25)
+	e.LastExecuteError = r.GetString(26)
 	return e
 }
