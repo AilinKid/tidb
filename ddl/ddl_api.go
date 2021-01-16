@@ -1828,6 +1828,9 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	if err != nil {
 		return errors.Trace(err)
 	}
+	if s.Schedule.Ends == nil {
+		endTime = types.GetMaxValue(types.NewFieldType(mysql.TypeDatetime))
+	}
 	endTime, err = expression.EvalAstExpr(ctx, s.Schedule.Ends)
 	if err != nil {
 		return errors.Trace(err)
