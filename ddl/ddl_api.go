@@ -1879,9 +1879,10 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		case years > 0:
 		case years == 0 && months > 0:
 		case years == 0 && months == 0 && days > 0:
-		case years == 0 && months == 0 && days == 0 && nanos > 0:
+		case years == 0 && months == 0 && days == 0 && nanos >= 1_000_000_000:
 		default:
 			// TODO: what duration is to big?
+			// TODO: scheduling events with < 1s seems to cause events to be scheduled at 0s interval, this should be fixed.
 			return errors.Trace(ErrEventIntervalNotPositiveOrTooBig)
 		}
 
