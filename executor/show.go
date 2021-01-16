@@ -39,6 +39,7 @@ import (
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/ddl"
 	"github.com/pingcap/tidb/ddl/event"
+	model2 "github.com/pingcap/tidb/ddl/event/model"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/infoschema"
@@ -1029,73 +1030,67 @@ func (e *ShowExec) fetchShowClusterConfigs(ctx context.Context) error {
 }
 
 // ConstructResultOfShowCreateEvent is the SHOW CREATE output for an event.
-func ConstructResultOfShowCreateEvent(ctx sessionctx.Context, eventID int64, eventSchemaID int64, buf *bytes.Buffer) error {
-	event, err := event.GetFromID(ctx, eventID, eventSchemaID)
-	if err != nil {
-		return err
-	}
+func ConstructResultOfShowCreateEvent(ctx sessionctx.Context, ev *model2.EventInfo, buf *bytes.Buffer) error {
 
 	fmt.Fprintf(buf, "CREATE DEFINER=")
 	fmt.Fprintf(buf, "`root`@`localhost` ") // TODO: definer is currently broken
 	fmt.Fprintf(buf, "EVENT ")
 
-	name := event.EventName.String()
+	name := ev.EventName.String()
 	fmt.Fprintf(buf, stringutil.Escape(name, ctx.GetSessionVars().SQLMode))
 
 	fmt.Fprintf(buf, " ON SCHEDULE ")
 
-	if event.EventType == "ONE TIME" {
-		fmt.Fprintf(buf, "AT '%s' ", event.ExecuteAt)
+	if ev.EventType == "ONE TIME" {
+		fmt.Fprintf(buf, "AT '%s' ", ev.ExecuteAt)
 	} else {
-		fmt.Fprintf(buf, "EVERY %s %s ", event.IntervalValue, event.IntervalUnit.String())
+		fmt.Fprintf(buf, "EVERY %s %s ", ev.IntervalValue, ev.IntervalUnit.String())
 
 		if true { // TODO: check if STARTS not null
-			fmt.Fprintf(buf, "STARTS '%s' ", event.Starts)
+			fmt.Fprintf(buf, "STARTS '%s' ", ev.Starts)
 		}
 
 		if true { // TODO: check if ENDS not null
-			fmt.Fprintf(buf, "ENDS '%s' ", event.Ends)
+			fmt.Fprintf(buf, "ENDS '%s' ", ev.Ends)
 		}
 
 	}
 
 	// On completion Attribute
 	fmt.Fprintf(buf, "ON COMPLETION ")
-	if !event.Preserve {
+	if !ev.Preserve {
 		fmt.Fprintf(buf, "NOT ")
 	}
 	fmt.Fprintf(buf, "PRESERVE ")
 
 	// Enable / Disable status
-	fmt.Fprintf(buf, event.Enable.ShowCreateString())
+	fmt.Fprintf(buf, ev.Enable.ShowCreateString())
 	// Statement / Expression
-	fmt.Fprintf(buf, " DO %s", event.Statement)
+	fmt.Fprintf(buf, " DO %s", ev.Statement)
 
 	return nil
 }
 
 func (e *ShowExec) fetchShowCreateEvent() error {
-
-	tblRows, _, err := e.ctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(`SELECT event_id, event_schema_id, event_name, sql_mode, time_zone, charset, collation_connection, collation_database FROM mysql.async_event`)
+	if e.Table == nil {
+		return errors.New("event not found")
+	}
+	ev, err := event.GetFromName(e.ctx, e.Table.Name.L, e.Table.Schema.L)
 	if err != nil {
 		return err
 	}
-	for _, row := range tblRows {
-
-		var buf bytes.Buffer
-		ConstructResultOfShowCreateEvent(e.ctx, row.GetInt64(0), row.GetInt64(1), &buf)
-
-		record := []interface{}{
-			row.GetString(2), // EVENT_NAME
-			row.GetString(3), // SQL Mode
-			row.GetString(4), // TIME ZONE
-			buf.String(),     // SHOW CREATE EVENT
-			row.GetString(5), // CHARSET CLIENT
-			row.GetString(6), // COLLATION CONNECTION
-			row.GetString(7), // DATABASE COLLATION
-		}
-		e.appendRow(record)
+	var buf bytes.Buffer
+	ConstructResultOfShowCreateEvent(e.ctx, ev, &buf)
+	record := []interface{}{
+		ev.EventName.String(),
+		ev.SQLMode.String(),
+		ev.TimeZone,
+		buf.String(),
+		ev.Charset,
+		ev.CollationConnection,
+		ev.CollationDatabase,
 	}
+	e.appendRow(record)
 	return nil
 }
 
