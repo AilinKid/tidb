@@ -29,8 +29,8 @@ import (
 
 func (w *worker) onCreateEvent(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int64, _ error) {
 	eventInfo := &model2.EventInfo{}
-	var execAt, start, end, nextExecAt types.CoreTime
-	if err := job.DecodeArgs(eventInfo, &execAt, &start, &end, &nextExecAt); err != nil {
+	var execAt, start, end types.CoreTime
+	if err := job.DecodeArgs(eventInfo, &execAt, &start, &end); err != nil {
 		// Invalid arguments, cancel this job.
 		job.State = model.JobStateCancelled
 		return ver, errors.Trace(err)
@@ -38,7 +38,6 @@ func (w *worker) onCreateEvent(d *ddlCtx, t *meta.Meta, job *model.Job) (ver int
 	eventInfo.ExecuteAt = types.NewTime(execAt, mysql.TypeDatetime, types.DefaultFsp)
 	eventInfo.Starts = types.NewTime(start, mysql.TypeDatetime, types.DefaultFsp)
 	eventInfo.Ends = types.NewTime(end, mysql.TypeDatetime, types.DefaultFsp)
-	eventInfo.NextExecuteAt = types.NewTime(nextExecAt, mysql.TypeDatetime, types.DefaultFsp)
 	// Double check schema existence.
 	_, err := checkSchemaExistAndCancelNotExistJob(t, job)
 	if err != nil {

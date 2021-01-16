@@ -89,8 +89,7 @@ func (s *Scheduler) Run() {
 			return
 		}
 		if !nextTime.IsZero() {
-			// TODO: timezone?
-			nextTriggerTime, err = nextTime.GoTime(time.Local)
+			nextTriggerTime, err = nextTime.GoTime(time.UTC)
 			if err != nil {
 				logutil.BgLogger().Info("[event] fetch most recent event from system table fail")
 				return

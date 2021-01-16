@@ -75,7 +75,7 @@ const (
 
 	selectEventTableByNameSQL = `SELECT * FROM mysql.async_event where event_name = '%s' and event_schema_name = '%s'`
 
-	selectEventTableFetchExecutableEvent = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") and NEXT_EXECUTE_AT <= NOW() limit 1 for update`
+	selectEventTableFetchExecutableEvent = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") and NEXT_EXECUTE_AT <= UTC_TIMESTAMP() limit 1 for update`
 
 	selectEventTableFetchNextScheduledEvent = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") order by NEXT_EXECUTE_AT limit 1`
 

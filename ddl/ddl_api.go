@@ -1762,6 +1762,8 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		return nil
 	}
 
+	vars := ctx.GetSessionVars()
+
 	var sb strings.Builder
 	err = s.Action.Restore(format.NewRestoreCtx(format.DefaultRestoreFlags, &sb))
 	if err != nil {
@@ -1769,18 +1771,18 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	}
 	definer := s.Definer
 	if s.Definer.CurrentUser {
-		u := ctx.GetSessionVars().User
+		u := vars.User
 		definer = &auth.UserIdentity{Username: u.AuthUsername, Hostname: u.AuthHostname}
 	}
-	charset, collation := ctx.GetSessionVars().GetCharsetInfo()
-	timeZone, _ := ctx.GetSessionVars().GetSystemVar("time_zone")
+	charset, collation := vars.GetCharsetInfo()
+	timeZone, _ := vars.GetSystemVar("time_zone") // vars.TimeZone.String() is empty for fixed tz like '+08:00'.
 	eventInfo := &model2.EventInfo{
 		EventName:       ident.Name,
 		EventSchemaID:   schema.ID,
 		EventSchemaName: ident.Schema,
 
 		Definer:    definer,
-		SQLMode:    ctx.GetSessionVars().SQLMode,
+		SQLMode:    vars.SQLMode,
 		TimeZone:   timeZone,
 		BodyType:   "SQL",
 		Statement:  sb.String(),
@@ -1819,17 +1821,18 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	var startTime types.Datum
 	var endTime types.Datum
 	if s.Schedule.Starts == nil {
-		startTime = types.NewTimeDatum(types.CurrentTime(mysql.TypeDatetime))
+		startTime, err = expression.GetTimeValue(ctx, ast.CurrentTimestamp, mysql.TypeDatetime, 6)
 	} else {
 		startTime, err = expression.EvalAstExpr(ctx, s.Schedule.Starts)
-		if err != nil {
-			return errors.Trace(err)
-		}
 	}
-	startTime, err = startTime.ConvertTo(ctx.GetSessionVars().StmtCtx, types.NewFieldType(mysql.TypeDatetime))
 	if err != nil {
 		return errors.Trace(err)
 	}
+	startTime, err = startTime.ConvertTo(vars.StmtCtx, types.NewFieldType(mysql.TypeDatetime))
+	if err != nil {
+		return errors.Trace(err)
+	}
+
 	if s.Schedule.Ends == nil {
 		endTime = types.GetMaxValue(types.NewFieldType(mysql.TypeDatetime))
 	} else {
@@ -1838,13 +1841,19 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 			return errors.Trace(err)
 		}
 	}
-	endTime, err = endTime.ConvertTo(ctx.GetSessionVars().StmtCtx, types.NewFieldType(mysql.TypeDatetime))
+	endTime, err = endTime.ConvertTo(vars.StmtCtx, types.NewFieldType(mysql.TypeDatetime))
 	if err != nil {
 		return errors.Trace(err)
 	}
+
+	localTZ := vars.Location()
+
 	if s.Schedule.IntervalValue == nil {
 		eventInfo.EventType = "ONE TIME"
 		eventInfo.ExecuteAt = startTime.GetMysqlTime()
+		if err = eventInfo.ExecuteAt.ConvertTimeZone(localTZ, time.UTC); err != nil {
+			return errors.Trace(err)
+		}
 	} else {
 		if startTime.GetMysqlTime().Compare(endTime.GetMysqlTime()) == 1 {
 			return errors.Trace(ErrEventEndsBeforeStarts)
@@ -1878,10 +1887,16 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 
 		eventInfo.Starts = startTime.GetMysqlTime()
 		eventInfo.Ends = endTime.GetMysqlTime()
+		if err = eventInfo.Starts.ConvertTimeZone(localTZ, time.UTC); err != nil {
+			return errors.Trace(err)
+		}
+		if err = eventInfo.Ends.ConvertTimeZone(localTZ, time.UTC); err != nil {
+			return errors.Trace(err)
+		}
 	}
 
 	// the type.Time can't be marshalled correctly.
-	args := []interface{}{eventInfo, eventInfo.ExecuteAt.CoreTime(), eventInfo.Starts.CoreTime(), eventInfo.Ends.CoreTime(), eventInfo.NextExecuteAt.CoreTime()}
+	args := []interface{}{eventInfo, eventInfo.ExecuteAt.CoreTime(), eventInfo.Starts.CoreTime(), eventInfo.Ends.CoreTime()}
 	job := &model.Job{
 		SchemaID:   schema.ID,
 		TableID:    eventInfo.EventID,
