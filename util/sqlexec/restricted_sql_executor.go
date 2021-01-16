@@ -15,8 +15,11 @@ package sqlexec
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 
 	"github.com/pingcap/parser/ast"
+	"github.com/pingcap/parser/terror"
 	"github.com/pingcap/tidb/sessionctx/variable"
 	"github.com/pingcap/tidb/util/chunk"
 )
@@ -136,4 +139,44 @@ type MultiQueryNoDelayResult interface {
 	Status() uint16
 	// LastInsertID return last insert id for one statement in multi-queries.
 	LastInsertID() uint64
+}
+
+// RunSQL runs an SQL statement. The rows returned are all dropped.
+// On complete, the `resultChan` channel is filled with either the execution error or nil.
+func RunSQL(ctx context.Context, sctx SQLExecutor, sql string, internal bool, resultChan chan<- error) {
+	defer func() {
+		if r := recover(); r != nil {
+			buf := make([]byte, 4096)
+			stackSize := runtime.Stack(buf, false)
+			buf = buf[:stackSize]
+			resultChan <- fmt.Errorf("run sql panicked: %v", string(buf))
+		}
+	}()
+
+	var recordSets []RecordSet
+	var err error
+
+	if internal {
+		recordSets, err = sctx.ExecuteInternal(ctx, sql)
+	} else {
+		recordSets, err = sctx.Execute(ctx, sql)
+	}
+	if err != nil {
+		if len(recordSets) > 0 {
+			terror.Call(recordSets[0].Close)
+		}
+		resultChan <- err
+		return
+	}
+
+	recordSet := recordSets[0]
+	chk := recordSets[0].NewChunk()
+	for {
+		err = recordSet.Next(ctx, chk)
+		if err != nil || chk.NumRows() == 0 {
+			break
+		}
+	}
+	terror.Call(recordSets[0].Close)
+	resultChan <- err
 }

@@ -16,7 +16,6 @@ package bindinfo
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -848,7 +847,7 @@ func (h *BindHandle) getRunningDuration(sctx sessionctx.Context, db, sql string,
 	timer := time.NewTimer(maxTime)
 	resultChan := make(chan error)
 	startTime := time.Now()
-	go runSQL(ctx, sctx, sql, resultChan)
+	go sqlexec.RunSQL(ctx, sctx.(sqlexec.SQLExecutor), sql, true, resultChan)
 	select {
 	case err := <-resultChan:
 		cancelFunc()
@@ -862,35 +861,6 @@ func (h *BindHandle) getRunningDuration(sctx sessionctx.Context, db, sql string,
 	}
 	<-resultChan
 	return -1, nil
-}
-
-func runSQL(ctx context.Context, sctx sessionctx.Context, sql string, resultChan chan<- error) {
-	defer func() {
-		if r := recover(); r != nil {
-			buf := make([]byte, 4096)
-			stackSize := runtime.Stack(buf, false)
-			buf = buf[:stackSize]
-			resultChan <- fmt.Errorf("run sql panicked: %v", string(buf))
-		}
-	}()
-	recordSets, err := sctx.(sqlexec.SQLExecutor).ExecuteInternal(ctx, sql)
-	if err != nil {
-		if len(recordSets) > 0 {
-			terror.Call(recordSets[0].Close)
-		}
-		resultChan <- err
-		return
-	}
-	recordSet := recordSets[0]
-	chk := recordSets[0].NewChunk()
-	for {
-		err = recordSet.Next(ctx, chk)
-		if err != nil || chk.NumRows() == 0 {
-			break
-		}
-	}
-	terror.Call(recordSets[0].Close)
-	resultChan <- err
 }
 
 // HandleEvolvePlanTask tries to evolve one plan task.

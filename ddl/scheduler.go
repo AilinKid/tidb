@@ -100,6 +100,7 @@ func (s *Scheduler) Run() {
 }
 
 func claimTriggeredEvents(sctx sessionctx.Context, uuid string) error {
+	resultChan := make(chan error, 1)
 	for {
 		ev, err := event.Claim(sctx, uuid)
 		if err != nil {
@@ -113,9 +114,10 @@ func claimTriggeredEvents(sctx sessionctx.Context, uuid string) error {
 			// There is no valid triggered events.
 			return nil
 		}
+
 		// Execute event action.
-		_, err = sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), ev.Statement)
-		event.UpdateEventResult(ev, sctx, err)
+		sqlexec.RunSQL(context.TODO(), sctx.(sqlexec.SQLExecutor), ev.Statement, false, resultChan)
+		event.UpdateEventResult(ev, sctx, <-resultChan)
 	}
 }
 
