@@ -82,7 +82,7 @@ const (
 
 	selectEventTableFetchNextScheduledEvent = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") order by NEXT_EXECUTE_AT limit 1`
 
-	deleteEventTableByIDSQL = `DELETE * FROM mysql.async_event where event_id = %d and event_schema_id = %d`
+	deleteEventTableByIDSQL = `DELETE FROM mysql.async_event where event_id = %d and event_schema_id = %d`
 
 	updateEventTableByIDSQL = `UPDATE mysql.async_event set STATUS = "%s", NEXT_EXECUTE_AT = "%s" where event_id = %d and event_schema_id = %d`
 )

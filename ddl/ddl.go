@@ -123,7 +123,7 @@ type DDL interface {
 	DropSequence(ctx sessionctx.Context, tableIdent ast.Ident, ifExists bool) (err error)
 	AlterSequence(ctx sessionctx.Context, stmt *ast.AlterSequenceStmt) error
 	CreateEvent(ctx sessionctx.Context, stmt *ast.CreateEventStmt) error
-	// DropEvent(ctx sessionctx.Context, tableIdent ast.Ident, ifExists bool) error
+	DropEvent(ctx sessionctx.Context, stmt *ast.DropEventStmt) error
 	// AlterEvent(ctx sessionctx.Context, stmt *ast.AlterEventStmt) error
 
 	// CreateSchemaWithInfo creates a database (schema) given its database info.
