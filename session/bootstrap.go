@@ -207,7 +207,7 @@ const (
 		count 		BIGINT(64) NOT NULL,
 		repeats 	BIGINT(64) NOT NULL,
 		upper_bound BLOB NOT NULL,
-		lower_bound BLOB , 
+		lower_bound BLOB ,
 		ndv         BIGINT NOT NULL DEFAULT 0,
 		UNIQUE INDEX tbl(table_id, is_index, hist_id, bucket_id)
 	);`
@@ -351,7 +351,10 @@ const (
 		COMMENT varchar(2048),
 
 		NEXT_EXECUTE_AT datetime,
-		CREATED datetime,
+		CREATED datetime NOT NULL DEFAULT NOW(),
+
+		LAST_EXECUTE_RESULT enum('PENDING', 'RUNNING', 'FINISHED', 'FAILED') NOT NULL DEFAULT 'PENDING',
+		LAST_EXECUTE_ERROR text NOT NULL DEFAULT '',
 
 		UNIQUE uni_1 (EVENT_SCHEMA_ID, EVENT_ID),
 		UNIQUE uni_2 (EVENT_SCHEMA_NAME, EVENT_NAME)

@@ -127,7 +127,7 @@ func (s *persistenceSuite) TestEventSystemTable(c *C) {
 	c.Assert(e.CollationConnection, Equals, e3.CollationConnection)
 	c.Assert(e.Comment, Equals, e3.Comment)
 
-	statement, err := event.Claim(tk.Se, "")
+	ev, err := event.Claim(tk.Se, "")
 	c.Assert(err, IsNil)
-	c.Assert(statement, Equals, "select * from t")
+	c.Assert(ev.Statement, Equals, "select * from t")
 }

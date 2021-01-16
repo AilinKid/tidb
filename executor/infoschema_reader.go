@@ -880,8 +880,32 @@ func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []
 	checker := privilege.GetPrivilegeManager(ctx)
 	var rows [][]types.Datum
 
-	tblRows, _, err := ctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(`SELECT event_schema_name, event_name, definer, time_zone, event_body_type, event_definition, 
-	event_type, execute_at, interval_value, interval_unit, sql_mode, starts, ends, status, preserve, comment, originator, charset, collation_connection, collation_database, created FROM mysql.async_event`)
+	tblRows, _, err := ctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(`
+		SELECT
+			event_schema_name, -- 0
+			event_name, -- 1
+			definer, -- 2
+			time_zone, -- 3
+			event_body_type, -- 4
+			event_definition, -- 5
+			event_type, -- 6
+			execute_at, -- 7
+			interval_value, -- 8
+			interval_unit, -- 9
+			sql_mode, -- 10
+			starts, -- 11
+			ends, -- 12
+			status, -- 13
+			preserve, -- 14
+			comment, -- 15
+			originator, -- 16
+			charset, -- 17
+			collation_connection, -- 18
+			collation_database, -- 19
+			created, -- 20
+			last_execute_result, -- 21
+			last_execute_error -- 22
+		FROM mysql.async_event`)
 	if err != nil {
 		return
 	}
@@ -924,6 +948,8 @@ func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []
 			row.GetString(17), // CHARSET CLIENT
 			row.GetString(18), // COLLATION CONNECTION
 			row.GetString(19), // DATABASE COLLATION
+			row.GetString(21), // LAST_EXECUTE_RESULT
+			row.GetString(22), // LAST_EXECUTE_ERROR
 		)
 		rows = append(rows, record)
 	}
