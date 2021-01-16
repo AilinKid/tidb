@@ -55,13 +55,14 @@ func (s *persistenceSuite) TestEventSystemTable(c *C) {
 		IntervalValue: "3",
 		IntervalUnit:  ast.TimeUnitHour,
 
-		Enable:     model2.TypeEnabled,
-		Preserve:   true,
-		Originator: 1,
-		Instance:   "",
-		Charset:    "UTF8",
-		Collation:  "UTF8MB4",
-		Comment:    "Nothing",
+		Enable:              model2.TypeEnabled,
+		Preserve:            true,
+		Originator:          1,
+		Instance:            "",
+		Charset:             "UTF8",
+		CollationDatabase:   "UTF8MB4",
+		CollationConnection: "UTF8MB4",
+		Comment:             "Nothing",
 	}
 	err = event.Insert(e, tk.Se)
 	c.Assert(err, IsNil)
@@ -93,7 +94,8 @@ func (s *persistenceSuite) TestEventSystemTable(c *C) {
 	c.Assert(e.Originator, Equals, e2.Originator)
 	c.Assert(e.Instance, Equals, e2.Instance)
 	c.Assert(e.Charset, Equals, e2.Charset)
-	c.Assert(e.Collation, Equals, e2.Collation)
+	c.Assert(e.CollationDatabase, Equals, e2.CollationDatabase)
+	c.Assert(e.CollationConnection, Equals, e2.CollationConnection)
 	c.Assert(e.Comment, Equals, e2.Comment)
 
 	e3, err := event.GetFromName(tk.Se, "a", "b")
@@ -121,7 +123,8 @@ func (s *persistenceSuite) TestEventSystemTable(c *C) {
 	c.Assert(e.Originator, Equals, e2.Originator)
 	c.Assert(e.Instance, Equals, e2.Instance)
 	c.Assert(e.Charset, Equals, e3.Charset)
-	c.Assert(e.Collation, Equals, e3.Collation)
+	c.Assert(e.CollationDatabase, Equals, e3.CollationDatabase)
+	c.Assert(e.CollationConnection, Equals, e3.CollationConnection)
 	c.Assert(e.Comment, Equals, e3.Comment)
 
 	statement, err := event.Claim(tk.Se, "")

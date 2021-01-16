@@ -119,9 +119,10 @@ type EventInfo struct {
 	// UUID of the instance, empty string = any
 	Instance string
 
-	Charset   string
-	Collation string
-	Comment   string
+	Charset             string
+	CollationConnection string
+	CollationDatabase   string
+	Comment             string
 	// Computed next execute time.
 	NextExecuteAt types.Time
 }

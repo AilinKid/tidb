@@ -881,7 +881,7 @@ func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []
 	var rows [][]types.Datum
 
 	tblRows, _, err := ctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(`SELECT event_schema_name, event_name, definer, time_zone, event_body_type, event_definition, 
-	event_type, execute_at, interval_value, interval_unit, sql_mode, starts, ends, status, preserve, comment, originator, charset, collation, created FROM mysql.async_event`)
+	event_type, execute_at, interval_value, interval_unit, sql_mode, starts, ends, status, preserve, comment, originator, charset, collation_connection, collation_database, created FROM mysql.async_event`)
 	if err != nil {
 		return
 	}
@@ -916,14 +916,14 @@ func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []
 			row.GetTime(12),   // ENDS
 			row.GetString(13), // STATUS
 			preserveStr,       // ON_COMPLETION
-			row.GetTime(19),   // CREATED
+			row.GetTime(20),   // CREATED
 			nil,               // LAST_ALTERED
 			nil,               // LAST_EXECUTED
 			row.GetString(15), // EVENT_COMMENT
 			row.GetInt64(16),  // ORIGINATOR
 			row.GetString(17), // CHARSET CLIENT
 			row.GetString(18), // COLLATION CONNECTION
-			row.GetString(18), // DATABASE COLLATION
+			row.GetString(19), // DATABASE COLLATION
 		)
 		rows = append(rows, record)
 	}

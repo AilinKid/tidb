@@ -1766,6 +1766,7 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	if err != nil {
 		return errors.Trace(err)
 	}
+	charset, collation := ctx.GetSessionVars().GetCharsetInfo()
 	eventInfo := &model2.EventInfo{
 		EventName:       ident.Name,
 		EventSchemaID:   schema.ID,
@@ -1783,9 +1784,11 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		// TODO: server id now can not be used, fix it soon.
 		// TODO: server id variable is not used by TiDB now.
 		Originator: 1,
-		// TODO: charset & collation
 
-		Comment: s.Comment,
+		Charset:             charset,
+		CollationConnection: collation, // TODO: differentiate these two collations
+		CollationDatabase:   collation,
+		Comment:             s.Comment,
 	}
 
 	// assign the event ID.

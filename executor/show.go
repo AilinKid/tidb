@@ -1076,7 +1076,7 @@ func ConstructResultOfShowCreateEvent(ctx sessionctx.Context, eventID int64, eve
 
 func (e *ShowExec) fetchShowCreateEvent() error {
 
-	tblRows, _, err := e.ctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(`SELECT event_id, event_schema_id, event_name, sql_mode, time_zone, charset, collation FROM mysql.async_event`)
+	tblRows, _, err := e.ctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(`SELECT event_id, event_schema_id, event_name, sql_mode, time_zone, charset, collation_connection, collation_database FROM mysql.async_event`)
 	if err != nil {
 		return err
 	}
@@ -1092,7 +1092,7 @@ func (e *ShowExec) fetchShowCreateEvent() error {
 			buf.String(),     // SHOW CREATE EVENT
 			row.GetString(5), // CHARSET CLIENT
 			row.GetString(6), // COLLATION CONNECTION
-			row.GetString(6), // DATABASE COLLATION
+			row.GetString(7), // DATABASE COLLATION
 		}
 		e.appendRow(record)
 	}

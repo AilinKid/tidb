@@ -346,7 +346,8 @@ const (
 		ORIGINATOR bigint,
 		INSTANCE varchar(64),
 		CHARSET varchar(64),
-		COLLATION varchar(64),
+		COLLATION_CONNECTION varchar(64),
+		COLLATION_DATABASE varchar(64),
 		COMMENT varchar(2048),
 
 		NEXT_EXECUTE_AT datetime,
