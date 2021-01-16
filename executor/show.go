@@ -1055,13 +1055,18 @@ func (e *ShowExec) fetchShowCreateEvent() error {
 	if err != nil {
 		return err
 	}
+	// Make the UTC -> User timezone conversion earlier than `ConstructResultOfShowCreateEvent`.
+	err = ev.ConvertTimezone()
+	if err != nil {
+		return err
+	}
 	var buf bytes.Buffer
 	ConstructResultOfShowCreateEvent(e.ctx, ev, &buf)
-	ev.ConvertTimezone()
 	record := []interface{}{
 		ev.EventName.String(),
 		ev.SQLMode.String(),
-		e.ctx.GetSessionVars().TimeZone,
+		// the show creat event timezone should be the defined one.
+		ev.TimeZone,
 		buf.String(),
 		ev.Charset,
 		ev.CollationConnection,
@@ -1703,8 +1708,10 @@ func (e *ShowExec) fetchEvents() error {
 		it := chunk.NewIterator4Chunk(req)
 		for row := it.Begin(); row != it.End(); row = it.Next() {
 			event := event.DecodeRowIntoEventInfo(new(model2.EventInfo), row)
-			event.ConvertTimezone()
-			fmt.Printf("event timezone %s\n", event.TimeZone)
+			err := event.ConvertTimezone()
+			if err != nil {
+				return errors.Trace(err)
+			}
 			e.result.AppendString(0, e.DBName.L)
 			e.result.AppendString(1, event.EventName.L)
 			e.result.AppendString(2, event.TimeZone)

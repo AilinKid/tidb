@@ -183,8 +183,17 @@ func (e *EventInfo) ConvertTimezone() error {
 	if err != nil {
 		return err
 	}
-	e.ExecuteAt.ConvertTimeZone(time.UTC, timezone)
-	e.Starts.ConvertTimeZone(time.UTC, timezone)
-	e.Ends.ConvertTimeZone(time.UTC, timezone)
+	err = e.ExecuteAt.ConvertTimeZone(time.UTC, timezone)
+	if err != nil {
+		return err
+	}
+	err = e.Starts.ConvertTimeZone(time.UTC, timezone)
+	if err != nil {
+		return err
+	}
+	err = e.Ends.ConvertTimeZone(time.UTC, timezone)
+	if err != nil {
+		return err
+	}
 	return nil
 }
