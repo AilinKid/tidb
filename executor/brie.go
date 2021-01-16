@@ -194,7 +194,17 @@ func (b *executorBuilder) buildBRIE(s *ast.BRIEStmt, schema *expression.Schema) 
 		LogProgress: true,
 	}
 
-	storageURL, err := url.Parse(s.Storage)
+	storageDatum, err := expression.EvalAstExpr(b.ctx, s.Storage)
+	if err != nil {
+		b.err = errors.Annotate(err, "invalid destination URL")
+		return nil
+	}
+	storageString, err := storageDatum.ToString()
+	if err != nil {
+		b.err = errors.Annotate(err, "invalid destination URL")
+		return nil
+	}
+	storageURL, err := url.Parse(storageString)
 	if err != nil {
 		b.err = errors.Annotate(err, "invalid destination URL")
 		return nil

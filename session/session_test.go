@@ -3678,14 +3678,14 @@ func (s *testBackupRestoreSuite) TestBackupAndRestore(c *C) {
 		tmpDir := path.Join(os.TempDir(), "bk1")
 		os.RemoveAll(tmpDir)
 		// backup database to tmp dir
-		tk.MustQuery("backup database * to 'local://" + tmpDir + "'")
+		tk.MustQuery("backup database * to concat('local://', ?)", tmpDir)
 
 		// remove database for recovery
 		tk.MustExec("drop database br")
 		tk.MustExec("drop database br02")
 
 		// restore database with backup data
-		tk.MustQuery("restore database * from 'local://" + tmpDir + "'")
+		tk.MustQuery("restore database * from concat('local://', ?)", tmpDir)
 		tk.MustExec("use br")
 		tk.MustQuery("select count(*) from t1").Check(testkit.Rows("3"))
 		tk.MustExec("drop database br")
