@@ -1890,6 +1890,41 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 	return errors.Trace(err)
 }
 
+// DropEvent drops a single event
+func (d *ddl) DropEvent(ctx sessionctx.Context, s *ast.DropEventStmt) (err error) {
+	session, err := d.sessPool.get()
+	if err != nil {
+		return errors.Trace(err)
+	}
+	defer d.sessPool.put(session)
+
+	eventInfo, err := event.CheckExist(session, ast.Ident{Schema: s.EventName.Schema, Name: s.EventName.Name})
+	if err != nil {
+		return err
+	}
+	if eventInfo == nil {
+		return errors.New("event name does not exist")
+	}
+
+	args := []interface{}{eventInfo}
+	job := &model.Job{
+		SchemaID:   eventInfo.EventSchemaID,
+		TableID:    eventInfo.EventID,
+		SchemaName: eventInfo.EventSchemaName.L,
+		Type:       model.ActionDropEvent,
+		BinlogInfo: &model.HistoryInfo{},
+		Args:       args,
+	}
+
+	err = d.doDDLJob(ctx, job)
+	if err != nil {
+		return err
+	}
+	err = d.callHookOnChanged(err)
+	return errors.Trace(err)
+
+}
+
 func (d *ddl) CreateTable(ctx sessionctx.Context, s *ast.CreateTableStmt) (err error) {
 	ident := ast.Ident{Schema: s.Table.Schema, Name: s.Table.Name}
 	is := d.GetInfoSchemaWithInterceptor(ctx)

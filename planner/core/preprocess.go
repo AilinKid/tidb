@@ -107,8 +107,8 @@ const (
 	// inSequenceFunction is set when visiting a sequence function.
 	// This flag indicates the tableName in these function should be checked as sequence object.
 	inSequenceFunction
-	//  inShowEvent is set when visiting a event via table name.
-	inShowEvent
+	//  inEvent is set when visiting a event via table name.
+	inEvent
 )
 
 // preprocessor is an ast.Visitor that preprocess
@@ -149,6 +149,9 @@ func (p *preprocessor) Enter(in ast.Node) (out ast.Node, skipChildren bool) {
 		p.flag |= inCreateOrDropTable
 		p.stmtTp = TypeDrop
 		p.checkDropTableGrammar(node)
+	case *ast.DropEventStmt:
+		p.stmtTp = TypeDrop
+		p.flag |= inEvent
 	case *ast.RenameTableStmt:
 		p.stmtTp = TypeRename
 		p.flag |= inCreateOrDropTable
@@ -172,7 +175,7 @@ func (p *preprocessor) Enter(in ast.Node) (out ast.Node, skipChildren bool) {
 	case *ast.ShowStmt:
 		p.stmtTp = TypeShow
 		if node.Tp == ast.ShowCreateEvent {
-			p.flag |= inShowEvent
+			p.flag |= inEvent
 		}
 		p.resolveShowStmt(node)
 	case *ast.SetOprSelectList:
@@ -1137,7 +1140,7 @@ func (p *preprocessor) handleTableName(tn *ast.TableName) {
 		return
 	}
 
-	if p.flag&inShowEvent > 0 {
+	if p.flag&inEvent > 0 {
 		p.handleEventName(tn)
 		return
 	}
