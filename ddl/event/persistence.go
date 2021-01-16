@@ -159,9 +159,12 @@ func Delete(e *model2.EventInfo, sctx sessionctx.Context) error {
 // Update Event
 func Update(e *model2.EventInfo, sctx sessionctx.Context) error {
 	// compute the next execution time.
-	err := e.ComputeNextExecuteUTCTime(sctx)
+	shouldDelete, err := e.ComputeNextExecuteUTCTime(sctx)
 	if err != nil {
 		return err
+	}
+	if shouldDelete {
+		return Delete(e, sctx)
 	}
 	sql := fmt.Sprintf(updateEventTableByIDSQL, e.Enable.String(), e.NextExecuteAt.String(), e.EventID, e.EventSchemaID)
 	logutil.BgLogger().Info("[event] update event table", zap.Int64("eventID", e.EventID), zap.Int64("event schema ID", e.EventSchemaID))
@@ -196,7 +199,7 @@ func UpdateEventResult(e *model2.EventInfo, sctx sessionctx.Context, err error) 
 // Insert store a eventInfo into physical system table --- event.
 func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 	// compute the next execution time.
-	err := e.ComputeNextExecuteUTCTime(sctx)
+	_, err := e.ComputeNextExecuteUTCTime(sctx)
 	if err != nil {
 		return err
 	}

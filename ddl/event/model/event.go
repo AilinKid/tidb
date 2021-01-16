@@ -126,13 +126,16 @@ type EventInfo struct {
 }
 
 // ComputeNextExecuteUTCTime compute the next execution time of this event.
-func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) error {
+func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) (bool, error) {
 	if e.EventType == "ONE TIME" || !e.ExecuteAt.IsZero() {
 		// For one time type event
 		if e.NextExecuteAt.IsZero() {
 			// The event hasn't been executed even once.
 			e.NextExecuteAt = e.ExecuteAt
 		} else {
+			if !e.Preserve {
+				return true, nil
+			}
 			e.Enable = TypeDisabled
 		}
 	} else {
@@ -140,16 +143,24 @@ func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) error {
 			e.NextExecuteAt = e.Starts
 		} else {
 			// Since the IntervalValue is not always a integer, take '30:20' MINUTE_SECOND into consideration.
+			if !(e.Ends.Compare(types.CurrentTime(mysql.TypeDatetime)) == 1) {
+				if !e.Preserve {
+					return true, nil
+				} else {
+					e.Enable = TypeDisabled
+					return false, nil
+				}
+			}
 			d, err := types.ExtractDurationValue(e.IntervalUnit.String(), e.IntervalValue)
 			if err != nil {
-				return err
+				return false, err
 			}
 			next, err := e.NextExecuteAt.Add(sctx.GetSessionVars().StmtCtx, d)
 			if err != nil {
-				return errors.Trace(err)
+				return false, errors.Trace(err)
 			}
 			e.NextExecuteAt = next
 		}
 	}
-	return nil
+	return false, nil
 }
