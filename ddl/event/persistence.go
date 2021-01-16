@@ -104,6 +104,17 @@ func FetchNextScheduledEvent(sctx sessionctx.Context, uuid string) (types.Time, 
 func Claim(sctx sessionctx.Context, uuid string) (*model2.EventInfo, error) {
 	logutil.BgLogger().Info("[event] start claim event")
 	// Begin.
+	successCommitFlag := false
+	defer func() {
+		// Rollback
+		if successCommitFlag {
+			return
+		}
+		_, err1 := sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), "rollback")
+		if err1 != nil {
+			logutil.BgLogger().Info("[event] claim event rollback fail.")
+		}
+	}()
 	_, err := sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), "begin")
 	if err != nil {
 		return nil, errors.Trace(err)
@@ -125,11 +136,12 @@ func Claim(sctx sessionctx.Context, uuid string) (*model2.EventInfo, error) {
 		return nil, errors.Trace(err)
 	}
 	// Commit.
-	_, _, err = sctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL("commit")
+	_, err = sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), "commit")
 	if err != nil {
 		logutil.BgLogger().Info("[event] claim event commit fail.")
 		return nil, errors.Trace(err)
 	}
+	successCommitFlag = true
 	return targetEvent, nil
 }
 
