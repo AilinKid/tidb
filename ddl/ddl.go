@@ -343,11 +343,6 @@ func (d *ddl) Start(ctxPool *pools.ResourcePool) error {
 	d.wg.Add(1)
 	go d.limitDDLJobs()
 
-	// TODO: receive the real event signal channel from apply diff.
-
-	d.wg.Add(1)
-	go d.runEventScheduler(EventDDLChangedChannel)
-
 	// If RunWorker is true, we need campaign owner and do DDL job.
 	// Otherwise, we needn't do that.
 	if RunWorker {
@@ -381,8 +376,9 @@ func (d *ddl) Start(ctxPool *pools.ResourcePool) error {
 		metrics.DDLCounter.WithLabelValues(metrics.StartCleanWork).Inc()
 	}
 
-	//eventScheduler := newScheduler(d.uuid, d.sessPool, )
-	//go eventScheduler.Run()
+	d.wg.Add(1)
+	go d.runEventScheduler(EventDDLChangedChannel)
+
 	variable.RegisterStatistics(d)
 
 	metrics.DDLCounter.WithLabelValues(metrics.CreateDDLInstance).Inc()
