@@ -1860,6 +1860,14 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		if s.Schedule.IntervalUnit != ast.TimeUnitInvalid {
 			eventInfo.IntervalUnit = s.Schedule.IntervalUnit
 		}
+		duration, err := types.ExtractDurationValue(eventInfo.IntervalUnit.String(), eventInfo.IntervalValue)
+		if err != nil {
+			return err
+		}
+		if duration.Compare(types.ZeroDuration) != 1 {
+			// TODO: what duration is to big?
+			return ErrEventIntervalNotPositiveOrTooBig.GenWithStackByArgs()
+		}
 		eventInfo.Starts = startTime.GetMysqlTime()
 		eventInfo.Ends = endTime.GetMysqlTime()
 	}

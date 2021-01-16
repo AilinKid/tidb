@@ -276,4 +276,7 @@ var (
 
 	// ErrEventEndsBeforeStarts is returned when the event's ends is before its starts.
 	ErrEventEndsBeforeStarts = dbterror.ClassDDL.NewStd(mysql.ErrEventEndsBeforeStarts)
+
+	// ErrEventIntervalNotPositiveOrTooBig is return when the event's interval is not valid.
+	ErrEventIntervalNotPositiveOrTooBig = dbterror.ClassDDL.NewStd(mysql.ErrEventIntervalNotPositiveOrTooBig)
 )
