@@ -152,6 +152,9 @@ func (p *preprocessor) Enter(in ast.Node) (out ast.Node, skipChildren bool) {
 	case *ast.DropEventStmt:
 		p.stmtTp = TypeDrop
 		p.flag |= inEvent
+	case *ast.AlterEventStmt:
+		p.stmtTp = TypeAlter
+		p.flag |= inEvent
 	case *ast.RenameTableStmt:
 		p.stmtTp = TypeRename
 		p.flag |= inCreateOrDropTable

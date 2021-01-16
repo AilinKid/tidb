@@ -84,6 +84,8 @@ const (
 	updateEventTableByIDSQL = `UPDATE mysql.async_event set STATUS = "%s", NEXT_EXECUTE_AT = "%s", last_execute_result = 'RUNNING' where event_id = %d and event_schema_id = %d`
 
 	updateEventResultByIDSQL = `UPDATE mysql.async_event SET last_execute_result = '%s', last_execute_error = '%s' WHERE event_id = %d AND event_schema_id = %d`
+
+	updateEventCommentByIDSQL = `UPDATE mysql.async_event SET comment = '%s' WHERE event_id = %d AND event_schema_id = %d`
 )
 
 // FetchNextScheduledEvent fetch the next event to be scheduled
@@ -164,6 +166,14 @@ func Update(e *model2.EventInfo, sctx sessionctx.Context) error {
 	sql := fmt.Sprintf(updateEventTableByIDSQL, e.Enable.String(), e.NextExecuteAt.String(), e.EventID, e.EventSchemaID)
 	logutil.BgLogger().Info("[event] update event table", zap.Int64("eventID", e.EventID), zap.Int64("event schema ID", e.EventSchemaID))
 	_, err = sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
+	return errors.Trace(err)
+}
+
+func UpdateEventComment(e *model2.EventInfo, sctx sessionctx.Context) error {
+	sql := fmt.Sprintf(updateEventCommentByIDSQL, e.Comment, e.EventID, e.EventSchemaID)
+	logutil.BgLogger().Info("[event] update event table", zap.Int64("eventID", e.EventID), zap.Int64("event schema ID", e.EventSchemaID))
+	fmt.Printf("result sql = %s\n", sql)
+	_, err := sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
 	return errors.Trace(err)
 }
 

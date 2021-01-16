@@ -1906,6 +1906,10 @@ func (d *ddl) DropEvent(ctx sessionctx.Context, s *ast.DropEventStmt) (err error
 		return errors.New("event name does not exist")
 	}
 
+	eventInfo, err = event.GetFromName(session, s.EventName.Name.L, s.EventName.Schema.L)
+	if err != nil {
+		return err
+	}
 	args := []interface{}{eventInfo}
 	job := &model.Job{
 		SchemaID:   eventInfo.EventSchemaID,
@@ -1923,6 +1927,42 @@ func (d *ddl) DropEvent(ctx sessionctx.Context, s *ast.DropEventStmt) (err error
 	err = d.callHookOnChanged(err)
 	return errors.Trace(err)
 
+}
+
+func (d *ddl) AlterEvent(ctx sessionctx.Context, s *ast.AlterEventStmt) (err error) {
+	session, err := d.sessPool.get()
+	if err != nil {
+		return errors.Trace(err)
+	}
+	defer d.sessPool.put(session)
+
+	eventInfo, err := event.CheckExist(session, ast.Ident{Schema: s.EventName.Schema, Name: s.EventName.Name})
+	if err != nil {
+		return err
+	}
+	if eventInfo == nil {
+		return errors.New("event name does not exist")
+	}
+
+	eventInfo, err = event.GetFromName(session, s.EventName.Name.L, s.EventName.Schema.L)
+	fmt.Printf("comment %s\n", s.EventOptions.Comment)
+	eventInfo.Comment = s.EventOptions.Comment
+	args := []interface{}{eventInfo}
+	job := &model.Job{
+		SchemaID:   eventInfo.EventSchemaID,
+		TableID:    eventInfo.EventID,
+		SchemaName: eventInfo.EventSchemaName.L,
+		Type:       model.ActionAlterEvent,
+		BinlogInfo: &model.HistoryInfo{},
+		Args:       args,
+	}
+
+	err = d.doDDLJob(ctx, job)
+	if err != nil {
+		return err
+	}
+	err = d.callHookOnChanged(err)
+	return errors.Trace(err)
 }
 
 func (d *ddl) CreateTable(ctx sessionctx.Context, s *ast.CreateTableStmt) (err error) {

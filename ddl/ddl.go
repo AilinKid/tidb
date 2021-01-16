@@ -124,7 +124,7 @@ type DDL interface {
 	AlterSequence(ctx sessionctx.Context, stmt *ast.AlterSequenceStmt) error
 	CreateEvent(ctx sessionctx.Context, stmt *ast.CreateEventStmt) error
 	DropEvent(ctx sessionctx.Context, stmt *ast.DropEventStmt) error
-	// AlterEvent(ctx sessionctx.Context, stmt *ast.AlterEventStmt) error
+	AlterEvent(ctx sessionctx.Context, stmt *ast.AlterEventStmt) error
 
 	// CreateSchemaWithInfo creates a database (schema) given its database info.
 	//

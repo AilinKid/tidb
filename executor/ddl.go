@@ -128,6 +128,8 @@ func (e *DDLExec) Next(ctx context.Context, req *chunk.Chunk) (err error) {
 		err = e.executeCreateEvent(x)
 	case *ast.DropEventStmt:
 		err = e.executeDropEvent(x)
+	case *ast.AlterEventStmt:
+		err = e.executeAlterEvent(x)
 	}
 	if err != nil {
 		// If the owner return ErrTableNotExists error when running this DDL, it may be caused by schema changed,
@@ -633,4 +635,8 @@ func (e *DDLExec) executeCreateEvent(s *ast.CreateEventStmt) error {
 
 func (e *DDLExec) executeDropEvent(s *ast.DropEventStmt) error {
 	return domain.GetDomain(e.ctx).DDL().DropEvent(e.ctx, s)
+}
+
+func (e *DDLExec) executeAlterEvent(s *ast.AlterEventStmt) error {
+	return domain.GetDomain(e.ctx).DDL().AlterEvent(e.ctx, s)
 }

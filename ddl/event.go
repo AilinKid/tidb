@@ -113,3 +113,29 @@ func (w *worker) onDropEvent(t *meta.Meta, job *model.Job) (ver int64, _ error) 
 	return ver, nil
 
 }
+
+func (w *worker) onAlterEvent(t *meta.Meta, job *model.Job) (ver int64, _ error) {
+	eventInfo := &model2.EventInfo{}
+	if err := job.DecodeArgs(eventInfo); err != nil {
+		// Invalid arguments, cancel this job.
+		job.State = model.JobStateCancelled
+		return ver, errors.Trace(err)
+	}
+	sctx, err := w.sessPool.get()
+	if err != nil {
+		return ver, errors.Trace(err)
+	}
+	defer w.sessPool.put(sctx)
+
+	err = event.UpdateEventComment(eventInfo, sctx)
+	if err != nil {
+		return ver, errors.Trace(err)
+	}
+	ver, err = updateSchemaVersion(t, job)
+	if err != nil {
+		return ver, errors.Trace(err)
+	}
+	// Finish this job.
+	job.FinishTableJob(model.JobStateDone, model.StatePublic, ver, nil)
+	return ver, nil
+}
