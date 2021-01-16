@@ -672,6 +672,8 @@ var tableEventsCols = []columnInfo{
 	{name: "CHARACTER_SET_CLIENT", tp: mysql.TypeVarchar, size: 64, flag: mysql.NotNullFlag},
 	{name: "COLLATION_CONNECTION", tp: mysql.TypeVarchar, size: 64, flag: mysql.NotNullFlag},
 	{name: "DATABASE_COLLATION", tp: mysql.TypeVarchar, size: 64, flag: mysql.NotNullFlag},
+	{name: "LAST_EXECUTE_RESULT", tp: mysql.TypeVarchar, size: 8, flag: mysql.NotNullFlag},
+	{name: "LAST_EXECUTE_ERROR", tp: mysql.TypeVarchar, size: 2048, flag: mysql.NotNullFlag},
 }
 
 var tableGlobalStatusCols = []columnInfo{

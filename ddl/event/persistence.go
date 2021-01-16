@@ -29,54 +29,51 @@ import (
 	model2 "github.com/pingcap/tidb/ddl/event/model"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/util/chunk"
+	"github.com/pingcap/tidb/util/format"
 	"github.com/pingcap/tidb/util/logutil"
 	"github.com/pingcap/tidb/util/sqlexec"
 	"go.uber.org/zap"
 )
 
+// TODO: FIX ALL SQL INJECTION!!!!!!
+
 const (
-	insertEventTablePrefix = `INSERT IGNORE INTO mysql.async_event VALUES `
+	insertEventTableSQL = `
+		INSERT IGNORE INTO mysql.async_event
+		SET
+			event_id = %d,
+			event_name = '%s',
+			event_schema_id = %d,
+			event_schema_name = '%s',
 
-	// EVENT_ID             |    bigint(20)
-	// EVENT_NAME           |    varchar(64)
-	// EVENT_SCHEMA_ID      |    bigint(20)
-	// EVENT_SCHEMA_NAME    |    varchar(64)
+			definer = '%s',
+			sql_mode = '%s',
+			time_zone = '%s',
+			event_body_type = '%s',
+			event_type = '%s',
+			event_definition = '%s',
 
-	// DEFINER              |    varchar(288)
-	// SQL_MODE             |    varchar(8192)
-	// TIME_ZONE            |    varchar(64)
-	// EVENT_BODY           |    varchar(3)
-	// EVENT_TYPE           |    varchar(9)
-	// EVENT_DEFINITION     |    longtext
+			execute_at = '%s',
+			starts = '%s',
+			ends = '%s',
+			interval_value = '%s',
+			interval_unit = %d,
 
-	// EXECUTE_AT           |    datetime
-	// STARTS               |    datetime
-	// ENDS                 |    datetime
-	// INTERVAL_VALUE       |    varchar(256)
-	// INTERVAL_UNIT        |    bigint(20)
+			status = '%s',
+			preserve = %t,
+			originator = %d,
+			instance = '%s',
+			charset = '%s',
+			collation_connection = '%s',
+			collation_database = '%s',
+			comment = '%s',
 
-	// STATUS               |    enum('ENABLED','DISABLED','SLAVESIDE_DISABLED')
-	// PRESERVE             |    boolean
-	// ORIGINATOR           |    bigint
-	// INSTANCE             |    varchar(64)
-	// CHARSET              |    varchar(64)
-	// COLLATION_CONNECTION |    varchar(64)
-	// COLLATION_DATABASE   |    varchar(64)
-	// COMMENT              |    varchar(2048)
-
-	// NEXT_EXECUTE_AT      |    datetime
-	// CREATED              |    datetime
-
-	insertEventTableValue = `(%d, "%s", %d, "%s",
-		"%s", "%s", "%s", "%s", "%s", "%s",
-		"%s", "%s", "%s", "%s", "%d",
-		"%s", %t, %d, "%s", "%s", "%s","%s", "%s", "%s", NOW())`
-
-	insertEventTableSQL = insertEventTablePrefix + insertEventTableValue
+			next_execute_at = '%s'
+	`
 
 	selectEventTableByIDSQL = `SELECT * FROM mysql.async_event where event_id = %d and event_schema_id = %d`
 
-	selectEventTableByNameSQL = `SELECT * FROM mysql.async_event where event_name = "%s" and event_schema_name = "%s"`
+	selectEventTableByNameSQL = `SELECT * FROM mysql.async_event where event_name = '%s' and event_schema_name = '%s'`
 
 	selectEventTableFetchExecutableEvent = `SELECT * FROM mysql.async_event where status="ENABLED" and (instance = "" or instance = "%s") and NEXT_EXECUTE_AT <= NOW() limit 1 for update`
 
@@ -84,7 +81,9 @@ const (
 
 	deleteEventTableByIDSQL = `DELETE FROM mysql.async_event where event_id = %d and event_schema_id = %d`
 
-	updateEventTableByIDSQL = `UPDATE mysql.async_event set STATUS = "%s", NEXT_EXECUTE_AT = "%s" where event_id = %d and event_schema_id = %d`
+	updateEventTableByIDSQL = `UPDATE mysql.async_event set STATUS = "%s", NEXT_EXECUTE_AT = "%s", last_execute_result = 'RUNNING' where event_id = %d and event_schema_id = %d`
+
+	updateEventResultByIDSQL = `UPDATE mysql.async_event SET last_execute_result = '%s', last_execute_error = '%s' WHERE event_id = %d AND event_schema_id = %d`
 )
 
 // FetchNextScheduledEvent fetch the next event to be scheduled
@@ -102,36 +101,36 @@ func FetchNextScheduledEvent(sctx sessionctx.Context, uuid string) (types.Time, 
 }
 
 // Claim is used to claim a triggered event int the system table concurrently.
-func Claim(sctx sessionctx.Context, uuid string) (string, error) {
+func Claim(sctx sessionctx.Context, uuid string) (*model2.EventInfo, error) {
 	logutil.BgLogger().Info("[event] start claim event")
 	// Begin.
 	_, err := sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), "begin")
 	if err != nil {
-		return "", errors.Trace(err)
+		return nil, errors.Trace(err)
 	}
 	// Select for update.
 	sql := fmt.Sprintf(selectEventTableFetchExecutableEvent, uuid)
 	res, err := getEventInfos(sctx, sql)
 	if err != nil {
-		return "", errors.Trace(err)
+		return nil, errors.Trace(err)
 	}
 	if len(res) == 0 {
-		return "", nil
+		return nil, nil
 	}
 
 	// Update.
 	targetEvent := res[0]
 	err = Update(targetEvent, sctx)
 	if err != nil {
-		return "", errors.Trace(err)
+		return nil, errors.Trace(err)
 	}
 	// Commit.
 	_, _, err = sctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL("commit")
 	if err != nil {
 		logutil.BgLogger().Info("[event] claim event commit fail.")
-		return "", errors.Trace(err)
+		return nil, errors.Trace(err)
 	}
-	return targetEvent.Statement, nil
+	return targetEvent, nil
 }
 
 // Delete delete a eventInfo in physical system table.
@@ -156,6 +155,22 @@ func Update(e *model2.EventInfo, sctx sessionctx.Context) error {
 	return errors.Trace(err)
 }
 
+func UpdateEventResult(e *model2.EventInfo, sctx sessionctx.Context, err error) error {
+	var result, errMsg string
+	if err != nil {
+		result = "FAILED"
+		errMsg = format.OutputFormat(err.Error())
+	} else {
+		result = "FINISHED"
+		errMsg = ""
+	}
+	sql := fmt.Sprintf(updateEventResultByIDSQL, result, errMsg, e.EventID, e.EventSchemaID)
+	logutil.BgLogger().Info("[event] update event result", zap.Int64("eventID", e.EventID), zap.Int64("event schema ID", e.EventSchemaID), zap.Error(err))
+	fmt.Printf("result sql = %s\n", sql)
+	_, err = sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
+	return errors.Trace(err)
+}
+
 // Insert store a eventInfo into physical system table --- event.
 func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 	// compute the next execution time.
@@ -163,10 +178,36 @@ func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 	if err != nil {
 		return err
 	}
-	sql := fmt.Sprintf(insertEventTableSQL, e.EventID, e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
-		e.Definer, e.SQLMode.String(), e.TimeZone, e.BodyType, e.EventType, e.Statement,
-		e.ExecuteAt.String(), e.Starts.String(), e.Ends.String(), e.IntervalValue, e.IntervalUnit,
-		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.CollationConnection, e.CollationDatabase, e.Comment, e.NextExecuteAt.String())
+	sql := fmt.Sprintf(insertEventTableSQL,
+		e.EventID,
+		format.OutputFormat(e.EventName.O),
+		e.EventSchemaID,
+		format.OutputFormat(e.EventSchemaName.O),
+
+		e.Definer,
+		e.SQLMode.String(),
+		e.TimeZone,
+		e.BodyType,
+		e.EventType,
+		format.OutputFormat(e.Statement),
+
+		e.ExecuteAt.String(),
+		e.Starts.String(),
+		e.Ends.String(),
+		e.IntervalValue,
+		e.IntervalUnit,
+
+		e.Enable.String(),
+		e.Preserve,
+		e.Originator,
+		e.Instance,
+		e.Charset,
+		e.CollationConnection,
+		e.CollationDatabase,
+		format.OutputFormat(e.Comment),
+
+		e.NextExecuteAt.String(),
+	)
 
 	logutil.BgLogger().Info("[event] insert into event table", zap.Int64("eventID", e.EventID), zap.Int64("event schema ID", e.EventSchemaID))
 	_, err = sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
@@ -191,7 +232,11 @@ func GetFromID(sctx sessionctx.Context, eventID, eventSchemaID int64) (*model2.E
 
 // GetFromName fetch a *eventInfo with eventName and eventSchemaName via index.
 func GetFromName(sctx sessionctx.Context, eventName, eventSchemaName string) (*model2.EventInfo, error) {
-	sql := fmt.Sprintf(selectEventTableByNameSQL, eventName, eventSchemaName)
+	sql := fmt.Sprintf(
+		selectEventTableByNameSQL,
+		format.OutputFormat(eventName),
+		format.OutputFormat(eventSchemaName),
+	)
 	logutil.BgLogger().Info("[event] select from event table", zap.String("event Name", eventName), zap.String("event schema Name", eventSchemaName))
 	res, err := getEventInfos(sctx, sql)
 	if err != nil {

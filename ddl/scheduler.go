@@ -15,7 +15,6 @@ package ddl
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/pingcap/errors"
@@ -102,7 +101,7 @@ func (s *Scheduler) Run() {
 
 func claimTriggeredEvents(sctx sessionctx.Context, uuid string) error {
 	for {
-		statement, err := event.Claim(sctx, uuid)
+		ev, err := event.Claim(sctx, uuid)
 		if err != nil {
 			if kv.ErrTxnRetryable.Equal(err) || kv.ErrWriteConflict.Equal(err) || kv.ErrWriteConflictInTiDB.Equal(err) {
 				// the claimed event is done by other TiDB node, retry to fetch other triggered events.
@@ -110,20 +109,13 @@ func claimTriggeredEvents(sctx sessionctx.Context, uuid string) error {
 			}
 			return errors.Trace(err)
 		}
-		if statement != "" {
-			// Execute event action.
-			sqls := strings.Split(statement, ";")
-			for _, sql := range sqls {
-				_, err := sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), sql)
-				if err != nil {
-					// TODO: record the error message down.
-					break
-				}
-			}
-		} else {
+		if ev == nil {
 			// There is no valid triggered events.
 			return nil
 		}
+		// Execute event action.
+		_, err = sctx.(sqlexec.SQLExecutor).ExecuteInternal(context.TODO(), ev.Statement)
+		event.UpdateEventResult(ev, sctx, err)
 	}
 }
 
