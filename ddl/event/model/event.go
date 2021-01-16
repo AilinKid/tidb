@@ -145,7 +145,7 @@ func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) (bool, er
 			e.NextExecuteAt = e.Starts
 		} else {
 			// Since the IntervalValue is not always a integer, take '30:20' MINUTE_SECOND into consideration.
-			if !(e.Ends.Compare(types.CurrentTime(mysql.TypeDatetime)) == 1) {
+			if e.Ends.Compare(types.CurrentTime(mysql.TypeDatetime)) <= 0 {
 				if !e.Preserve {
 					return true, nil
 				} else {
