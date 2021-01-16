@@ -64,10 +64,12 @@ const (
 	// COMMENT           |    varchar(2048)
 
 	// NEXT_EXECUTE_AT   |    datetime
+	// CREATED           |    datetime
+
 	insertEventTableValue = `(%d, "%s", %d, "%s",
 		"%s", %d, "%s", "%s", "%s", "%s",
 		"%s", "%s", "%s", "%s", "%d",
-		"%s", %t, %d, "%s", "%s", "%s", "%s", "%s")`
+		"%s", %t, %d, "%s", "%s", "%s", "%s", "%s", NOW())`
 
 	insertEventTableSQL = insertEventTablePrefix + insertEventTableValue
 

@@ -349,7 +349,8 @@ const (
 		COLLATION varchar(64),
 		COMMENT varchar(2048),
 
-        NEXT_EXECUTE_AT datetime,
+		NEXT_EXECUTE_AT datetime,
+		CREATED datetime,
 
 		UNIQUE uni_1 (EVENT_SCHEMA_ID, EVENT_ID),
 		UNIQUE uni_2 (EVENT_SCHEMA_NAME, EVENT_NAME)
