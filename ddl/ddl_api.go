@@ -1837,19 +1837,6 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		return errors.Trace(err)
 	}
 
-	if s.Schedule.Ends == nil {
-		endTime = types.GetMaxValue(types.NewFieldType(mysql.TypeDatetime))
-	} else {
-		endTime, err = expression.EvalAstExpr(ctx, s.Schedule.Ends)
-		if err != nil {
-			return errors.Trace(err)
-		}
-	}
-	endTime, err = endTime.ConvertTo(vars.StmtCtx, types.NewFieldType(mysql.TypeDatetime))
-	if err != nil {
-		return errors.Trace(err)
-	}
-
 	if s.Schedule.IntervalValue == nil {
 		eventInfo.EventType = "ONE TIME"
 		eventInfo.ExecuteAt = startTime.GetMysqlTime()
@@ -1857,10 +1844,28 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 			return errors.Trace(err)
 		}
 	} else {
+		eventInfo.EventType = "RECURRING"
+		if s.Schedule.Ends == nil {
+			endTime = types.GetMaxValue(types.NewFieldType(mysql.TypeDatetime))
+			eventInfo.Ends = endTime.GetMysqlTime()
+		} else {
+			endTime, err = expression.EvalAstExpr(ctx, s.Schedule.Ends)
+			if err != nil {
+				return errors.Trace(err)
+			}
+			endTime, err = endTime.ConvertTo(vars.StmtCtx, types.NewFieldType(mysql.TypeDatetime))
+			if err != nil {
+				return errors.Trace(err)
+			}
+			eventInfo.Ends = endTime.GetMysqlTime()
+			if err = eventInfo.Ends.ConvertTimeZone(localTZ, time.UTC); err != nil {
+				return errors.Trace(err)
+			}
+		}
+
 		if startTime.GetMysqlTime().Compare(endTime.GetMysqlTime()) == 1 {
 			return errors.Trace(ErrEventEndsBeforeStarts)
 		}
-		eventInfo.EventType = "RECURRING"
 		interval, err := expression.EvalAstExpr(ctx, s.Schedule.IntervalValue)
 		if err != nil {
 			return errors.Trace(err)
@@ -1889,13 +1894,10 @@ func (d *ddl) CreateEvent(ctx sessionctx.Context, s *ast.CreateEventStmt) error 
 		}
 
 		eventInfo.Starts = startTime.GetMysqlTime()
-		eventInfo.Ends = endTime.GetMysqlTime()
 		if err = eventInfo.Starts.ConvertTimeZone(localTZ, time.UTC); err != nil {
 			return errors.Trace(err)
 		}
-		if err = eventInfo.Ends.ConvertTimeZone(localTZ, time.UTC); err != nil {
-			return errors.Trace(err)
-		}
+
 	}
 
 	// the type.Time can't be marshalled correctly.
