@@ -341,6 +341,7 @@ func tidbOptFloat64(opt string, defaultVal float64) float64 {
 	return val
 }
 
+// ParseTimeZone parses the timezone
 func ParseTimeZone(s string) (*time.Location, error) {
 	if strings.EqualFold(s, "SYSTEM") {
 		return timeutil.SystemLocation(), nil

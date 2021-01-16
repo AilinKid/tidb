@@ -149,10 +149,9 @@ func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) (bool, er
 			if e.Ends.Compare(types.CurrentTime(mysql.TypeDatetime)) <= 0 {
 				if !e.Preserve {
 					return true, nil
-				} else {
-					e.Enable = TypeDisabled
-					return false, nil
 				}
+				e.Enable = TypeDisabled
+				return false, nil
 			}
 			years, months, days, nanos, err := types.ParseDurationValue(e.IntervalUnit.String(), e.IntervalValue)
 			if err != nil {
@@ -178,13 +177,17 @@ func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) (bool, er
 	return false, nil
 }
 
+// ConvertTimezone converts the timezone
 func (e *EventInfo) ConvertTimezone() error {
 	timezone, err := variable.ParseTimeZone(e.TimeZone)
 	if err != nil {
 		return err
 	}
-	e.ExecuteAt.ConvertTimeZone(time.UTC, timezone)
-	e.Starts.ConvertTimeZone(time.UTC, timezone)
-	e.Ends.ConvertTimeZone(time.UTC, timezone)
-	return nil
+	if err := e.ExecuteAt.ConvertTimeZone(time.UTC, timezone); err != nil {
+		return err
+	}
+	if err := e.Starts.ConvertTimeZone(time.UTC, timezone); err != nil {
+		return err
+	}
+	return e.Ends.ConvertTimeZone(time.UTC, timezone)
 }

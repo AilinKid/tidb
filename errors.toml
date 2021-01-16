@@ -261,6 +261,16 @@ error = '''
 Duplicate partition name %-.192s
 '''
 
+["ddl:1542"]
+error = '''
+INTERVAL is either not positive or too big
+'''
+
+["ddl:1543"]
+error = '''
+ENDS is either invalid or before STARTS
+'''
+
 ["ddl:1564"]
 error = '''
 This partition function is not allowed
@@ -1224,6 +1234,16 @@ Incorrect foreign key definition for '%-.192s': %s
 ["schema:1347"]
 error = '''
 '%-.192s.%-.192s' is not %s
+'''
+
+["schema:1537"]
+error = '''
+Event '%-.192s' already exists
+'''
+
+["schema:1539"]
+error = '''
+Unknown event '%-.192s'
 '''
 
 ["schema:1831"]

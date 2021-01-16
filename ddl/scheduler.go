@@ -69,7 +69,8 @@ func (s *Scheduler) Run() {
 		// Related ddl events triggered.
 		case <-s.eventDDLChangedChannel:
 		// Next triggering time triggered.
-		case <-time.After(nextTriggerTime.Sub(time.Now())): // TODO overflow check
+		case <-time.After(time.Until(nextTriggerTime)): // TODO overflow check
+
 		// scheduler is dead.
 		case <-s.ctx.Done():
 			return
@@ -116,7 +117,9 @@ func claimTriggeredEvents(sctx sessionctx.Context, uuid string) error {
 
 		// Execute event action.
 		sqlexec.RunSQL(context.TODO(), sctx.(sqlexec.SQLExecutor), ev.Statement, false, resultChan)
-		event.UpdateEventResult(ev, sctx, <-resultChan)
+		if err := event.UpdateEventResult(ev, sctx, <-resultChan); err != nil {
+			return err
+		}
 	}
 }
 

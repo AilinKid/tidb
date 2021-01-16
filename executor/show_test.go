@@ -1229,5 +1229,5 @@ func (s *testSuite5) TestShowEvents(c *C) {
 	tk.MustExec("use test")
 	tk.Se.Auth(&auth.UserIdentity{Username: "root", Hostname: "localhost", CurrentUser: true, AuthUsername: "root", AuthHostname: "%"}, nil, []byte("012345678901234567890"))
 	tk.MustExec("create event e on schedule at '2029-01-16 10:38:00' do do 1;")
-	tk.MustQuery("show events").Check(testutil.RowsWithSep("|", "test|e|Asia/Shanghai|root@%|ONE TIME|2029-01-16 10:38:00|||0000-00-00 00:00:00|0000-00-00 00:00:00|ENABLED|1||||\x01\x00\x00\x00\x00\x00\x00\x00PENDING|"))
+	tk.MustQuery("show events").Check(testutil.RowsWithSep("|", "test|e|SYSTEM|root@%|ONE TIME|2029-01-16 10:38:00|||0000-00-00 00:00:00|0000-00-00 00:00:00|ENABLED|1||||\x01\x00\x00\x00\x00\x00\x00\x00PENDING|"))
 }

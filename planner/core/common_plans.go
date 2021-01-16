@@ -72,7 +72,7 @@ type ShowNextRowID struct {
 	TableName *ast.TableName
 }
 
-// ShoEvent is for showing the events.
+// ShowEvent is for showing the events.
 type ShowEvent struct {
 	baseSchemaProducer
 }

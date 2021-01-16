@@ -172,6 +172,7 @@ func Update(e *model2.EventInfo, sctx sessionctx.Context) error {
 	return errors.Trace(err)
 }
 
+// UpdateEventComment updates the comment
 func UpdateEventComment(e *model2.EventInfo, sctx sessionctx.Context) error {
 	sql := fmt.Sprintf(updateEventCommentByIDSQL, e.Comment, e.EventID, e.EventSchemaID)
 	logutil.BgLogger().Info("[event] update event table", zap.Int64("eventID", e.EventID), zap.Int64("event schema ID", e.EventSchemaID))
@@ -180,6 +181,7 @@ func UpdateEventComment(e *model2.EventInfo, sctx sessionctx.Context) error {
 	return errors.Trace(err)
 }
 
+// UpdateEventResult updates the status of the event after execution
 func UpdateEventResult(e *model2.EventInfo, sctx sessionctx.Context, err error) error {
 	var result, errMsg string
 	if err != nil {

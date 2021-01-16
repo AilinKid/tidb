@@ -915,9 +915,6 @@ func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []
 			continue
 		}
 
-		// TODO: save sqlMode as string, so it is safe for when sql-modes are removed in future.
-		// Has happened in MySQL but not TiDB.
-
 		preserveStr := "NOT PRESERVE"
 		if row.GetInt64(14) == 1 {
 			preserveStr = "PRESERVE"
@@ -928,11 +925,17 @@ func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []
 			return
 		}
 		executeAt := row.GetTime(7)
-		executeAt.ConvertTimeZone(time.UTC, timezone)
 		starts := row.GetTime(11)
-		starts.ConvertTimeZone(time.UTC, timezone)
 		ends := row.GetTime(12)
-		ends.ConvertTimeZone(time.UTC, timezone)
+		if err := executeAt.ConvertTimeZone(time.UTC, timezone); err != nil {
+			return
+		}
+		if err := starts.ConvertTimeZone(time.UTC, timezone); err != nil {
+			return
+		}
+		if err := ends.ConvertTimeZone(time.UTC, timezone); err != nil {
+			return
+		}
 		record := types.MakeDatums(
 			infoschema.CatalogVal, // EVENT_CATALOG
 			row.GetString(0),      // EVENT_SCHEMA
