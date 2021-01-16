@@ -894,8 +894,6 @@ func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []
 		// TODO: save sqlMode as string, so it is safe for when sql-modes are removed in future.
 		// Has happened in MySQL but not TiDB.
 
-		sqlMode := row.GetInt64(10)
-		sqlModeStr := strconv.FormatInt(sqlMode, 10)
 		preserveStr := "NOT PRESERVE"
 		if row.GetInt64(14) == 1 {
 			preserveStr = "PRESERVE"
@@ -913,7 +911,7 @@ func (e *memtableRetriever) setDataFromEvents(ctx sessionctx.Context, schemas []
 			row.GetTime(7),        // EXECUTE_AT
 			row.GetString(8),      // INTERVAL_VALUE
 			ast.TimeUnitType(row.GetUint64(9)).String(), // INTERVAL_FIELD
-			sqlModeStr,        // SQL_MODE
+			row.GetString(10), // SQL_MODE
 			row.GetTime(11),   // STARTS
 			row.GetTime(12),   // ENDS
 			row.GetString(13), // STATUS

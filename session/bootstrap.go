@@ -329,7 +329,7 @@ const (
 		EVENT_SCHEMA_NAME varchar(64),
 
 		DEFINER varchar(288),
-		SQL_MODE bigint,
+		SQL_MODE varchar(8192),
 		TIME_ZONE varchar(64),
 		EVENT_BODY_TYPE varchar(3),
 		EVENT_TYPE varchar(9),

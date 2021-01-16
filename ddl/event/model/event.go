@@ -126,7 +126,7 @@ type EventInfo struct {
 	NextExecuteAt types.Time
 }
 
-// ComputeNextExecuteTime compute the next execution time of this event.
+// ComputeNextExecuteUTCTime compute the next execution time of this event.
 func (e *EventInfo) ComputeNextExecuteUTCTime(sctx sessionctx.Context) error {
 	if e.EventType == "ONE TIME" || !e.ExecuteAt.IsZero() {
 		// For one time type event

@@ -1082,17 +1082,12 @@ func (e *ShowExec) fetchShowCreateEvent() error {
 	}
 	for _, row := range tblRows {
 
-		// TODO: save sqlMode as string, so it is safe for when sql-modes are removed in future.
-		// Has happened in MySQL but not TiDB.
-		sqlMode := row.GetInt64(3)
-		sqlModeStr := strconv.FormatInt(sqlMode, 10)
-
 		var buf bytes.Buffer
 		ConstructResultOfShowCreateEvent(e.ctx, row.GetInt64(0), row.GetInt64(1), &buf)
 
 		record := []interface{}{
 			row.GetString(2), // EVENT_NAME
-			sqlModeStr,       // SQL Mode
+			row.GetString(3), // SQL Mode
 			row.GetString(4), // TIME ZONE
 			buf.String(),     // SHOW CREATE EVENT
 			row.GetString(5), // CHARSET CLIENT

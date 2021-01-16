@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pingcap/parser/mysql"
 	"github.com/pingcap/parser/terror"
 	"github.com/pingcap/tidb/types"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/auth"
 	"github.com/pingcap/parser/model"
-	"github.com/pingcap/parser/mysql"
 	model2 "github.com/pingcap/tidb/ddl/event/model"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/util/chunk"
@@ -43,7 +43,7 @@ const (
 	// EVENT_SCHEMA_NAME |    varchar(64)
 
 	// DEFINER           |    varchar(288)
-	// SQL_MODE          |    bigint(20)
+	// SQL_MODE          |    varchar(8192)
 	// TIME_ZONE         |    varchar(64)
 	// EVENT_BODY        |    varchar(3)
 	// EVENT_TYPE        |    varchar(9)
@@ -67,7 +67,7 @@ const (
 	// CREATED           |    datetime
 
 	insertEventTableValue = `(%d, "%s", %d, "%s",
-		"%s", %d, "%s", "%s", "%s", "%s",
+		"%s", "%s", "%s", "%s", "%s", "%s",
 		"%s", "%s", "%s", "%s", "%d",
 		"%s", %t, %d, "%s", "%s", "%s", "%s", "%s", NOW())`
 
@@ -133,6 +133,16 @@ func Claim(sctx sessionctx.Context, uuid string) (string, error) {
 	return targetEvent.Statement, nil
 }
 
+func sQLModeToString(m mysql.SQLMode) string {
+	var modes []string
+	for mString, mVal := range mysql.Str2SQLMode {
+		if m&mVal == mVal {
+			modes = append(modes, mString)
+		}
+	}
+	return strings.Join(modes, ",")
+}
+
 // Delete delete a eventInfo in physical system table.
 func Delete(e *model2.EventInfo, sctx sessionctx.Context) error {
 	sql := fmt.Sprintf(deleteEventTableByIDSQL, e.EventID, e.EventSchemaID)
@@ -142,7 +152,7 @@ func Delete(e *model2.EventInfo, sctx sessionctx.Context) error {
 	return errors.Trace(err)
 }
 
-//
+// Update Event
 func Update(e *model2.EventInfo, sctx sessionctx.Context) error {
 	// compute the next execution time.
 	err := e.ComputeNextExecuteUTCTime(sctx)
@@ -163,7 +173,7 @@ func Insert(e *model2.EventInfo, sctx sessionctx.Context) error {
 		return err
 	}
 	sql := fmt.Sprintf(insertEventTableSQL, e.EventID, e.EventName.O, e.EventSchemaID, e.EventSchemaName.O,
-		e.Definer.String(), e.SQLMode, e.TimeZone, e.BodyType, e.EventType, e.Statement,
+		e.Definer.String(), sQLModeToString(e.SQLMode), e.TimeZone, e.BodyType, e.EventType, e.Statement,
 		e.ExecuteAt.String(), e.Starts.String(), e.Ends.String(), e.IntervalValue, e.IntervalUnit,
 		e.Enable.String(), e.Preserve, e.Originator, e.Instance, e.Charset, e.Collation, e.Comment, e.NextExecuteAt.String())
 
@@ -244,7 +254,7 @@ func DecodeRowIntoEventInfo(e *model2.EventInfo, r chunk.Row) *model2.EventInfo 
 
 	auths := strings.Split(r.GetString(4), "@")
 	e.Definer = &auth.UserIdentity{Username: auths[0], Hostname: auths[1]}
-	e.SQLMode = mysql.SQLMode(r.GetInt64(5))
+	e.SQLMode, _ = mysql.GetSQLMode(r.GetString(5))
 	e.TimeZone = r.GetString(6)
 	e.BodyType = r.GetString(7)
 	e.EventType = r.GetString(8)
