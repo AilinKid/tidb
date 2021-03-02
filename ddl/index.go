@@ -269,6 +269,10 @@ func dropIndexColumnFlag(tblInfo *model.TableInfo, indexInfo *model.IndexInfo) {
 			continue
 		}
 
+		if len(index.Columns) <= 0 {
+			continue
+		}
+
 		if index.Columns[0].Name.L != col.Name.L {
 			continue
 		}
