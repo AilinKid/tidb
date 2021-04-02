@@ -1029,14 +1029,9 @@ func (w *worker) doModifyColumnTypeWithData(
 				logutil.BgLogger().Warn("[ddl] run modify column job failed, convert job to rollback", zap.String("job", job.String()), zap.Error(err))
 				// When encounter these error above, we change the job to rolling back job directly.
 				job.State = model.JobStateRollingback
-				return ver, errors.Trace(err)
 			}
-			// Clean up the channel of notifyCancelReorgJob. Make sure it can't affect other jobs.
-			w.reorgCtx.cleanNotifyReorgCancel()
 			return ver, errors.Trace(err)
 		}
-		// Clean up the channel of notifyCancelReorgJob. Make sure it can't affect other jobs.
-		w.reorgCtx.cleanNotifyReorgCancel()
 
 		// Remove the old column and indexes. Update the relative column name and index names.
 		oldIdxIDs := make([]int64, 0, len(changingIdxs))
