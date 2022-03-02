@@ -3933,6 +3933,9 @@ func (b *PlanBuilder) tryBuildCTE(ctx context.Context, tn *ast.TableName, asName
 }
 
 func (b *PlanBuilder) buildDataSource(ctx context.Context, tn *ast.TableName, asName *model.CIStr) (LogicalPlan, error) {
+	if tn.TableInfo.Name.L == "t" || tn.TableInfo.Name.L == "t1" {
+		fmt.Println(1)
+	}
 	dbName := tn.Schema
 	sessionVars := b.ctx.GetSessionVars()
 
@@ -4302,7 +4305,7 @@ func (ds *DataSource) ExtractFD() *fd.FDSet {
 			}
 		}
 		// handle the datasource conditions (maybe pushed down from upper layer OP)
-		if ds.allConds != nil {
+		if len(ds.allConds) != 0 {
 			// extract the not null attributes from selection conditions.
 			notnullColsUniqueIDs := extractNotNullFromConds(ds.allConds, ds)
 
