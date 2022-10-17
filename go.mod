@@ -125,6 +125,7 @@ require (
 	cloud.google.com/go v0.100.2 // indirect
 	cloud.google.com/go/compute v1.5.0 // indirect
 	cloud.google.com/go/iam v0.1.1 // indirect
+	github.com/AilinKid/substrait-go v0.0.0-20221017053606-8cca1dcb1e21 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v0.20.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v0.8.1 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
