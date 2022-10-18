@@ -196,20 +196,27 @@ func (p *PhysicalLimit) ToPB(ctx sessionctx.Context, storeType kv.StoreType) (*t
 }
 
 func (p *PhysicalTableReader) ToSubstraitPB(ctx sessionctx.Context) (rel *substraitgo.Rel, err error) {
-	tableScan := p.TablePlans[0].(*PhysicalTableScan)
+	tableScan, ok := p.TablePlans[0].(*PhysicalTableScan)
+	if !ok {
+		return nil, nil
+	}
 	readRel := &substraitgo.ReadRel{}
 	var baseSchemaNames []string
 	var baseSchemaTypeStruct []*substraitgo.Type
 	for _, col := range tableScan.Table.Cols() {
-		baseSchemaNames = append(baseSchemaNames, col.Name.String())
+		// Velox is case-sensitive. We suppose all the table name and col name is lowercase.
+		baseSchemaNames = append(baseSchemaNames, col.Name.L)
 		colFT := types.TiDBFieldTypeToSubstraitType(&col.FieldType)
 		if colFT == nil {
 			return nil, nil
 		}
 		baseSchemaTypeStruct = append(baseSchemaTypeStruct, colFT)
 	}
-
 	readRel.BaseSchema = &substraitgo.NamedStruct{Names: baseSchemaNames, Struct: &substraitgo.Type_Struct{Types: baseSchemaTypeStruct}}
+	readRel.ReadType = &substraitgo.ReadRel_NamedTable_{
+		NamedTable: &substraitgo.ReadRel_NamedTable{
+			Names: []string{tableScan.DBName.L + "." + tableScan.Table.Name.L},
+		}}
 	return &substraitgo.Rel{RelType: &substraitgo.Rel_Read{Read: readRel}}, nil
 }
 
