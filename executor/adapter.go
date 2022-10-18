@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	substraitgo "github.com/AilinKid/substrait-go/proto"
 	"runtime/trace"
 	"strconv"
 	"strings"
@@ -480,6 +481,22 @@ func (a *ExecStmt) Exec(ctx context.Context) (_ sqlexec.RecordSet, err error) {
 
 	if sctx.GetSessionVars().StmtCtx.HasMemQuotaHint {
 		sctx.GetSessionVars().StmtCtx.MemTracker.SetBytesLimit(sctx.GetSessionVars().StmtCtx.MemQuotaQuery)
+	}
+	if pp, ok := a.Plan.(plannercore.PhysicalPlan); ok {
+		rel, err := pp.ToSubstraitPB(sctx)
+		if err == nil && sctx.GetSessionVars().ConnectionID != 0 {
+			plan := &substraitgo.Plan{
+				Relations: []*substraitgo.PlanRel{
+					{
+						RelType: &substraitgo.PlanRel_Root{
+							Root: &substraitgo.RelRoot{Input: rel},
+						},
+					},
+				},
+			}
+			// 把这个 rel 传给 velox
+			logutil.BgLogger().Error(plan.String())
+		}
 	}
 
 	e, err := a.buildExecutor()
