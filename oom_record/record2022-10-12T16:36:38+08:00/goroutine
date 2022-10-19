@@ -1,0 +1,573 @@
+goroutine 392 [running]:
+runtime/pprof.writeGoroutineStacks({0x107f804a0, 0x14015a80018})
+	/opt/homebrew/Cellar/go/1.19/libexec/src/runtime/pprof/pprof.go:692 +0x6c
+runtime/pprof.writeGoroutine({0x107f804a0?, 0x14015a80018?}, 0x172b9a2?)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/runtime/pprof/pprof.go:681 +0x2c
+runtime/pprof.(*Profile).WriteTo(0x106fe5f61?, {0x107f804a0?, 0x14015a80018?}, 0x14015a80000?)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/runtime/pprof/pprof.go:330 +0x150
+github.com/pingcap/tidb/util/memoryusagealarm.write({{0x106fe5f61?, 0x0?}, 0x0?}, {0x14010304270?, 0x140107c6120?})
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/memoryusagealarm/memoryusagealarm.go:370 +0x248
+github.com/pingcap/tidb/util/memoryusagealarm.(*memoryUsageAlarm).recordProfile(0x1079063a0, {0x14010304270, 0x2a})
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/memoryusagealarm/memoryusagealarm.go:355 +0xac
+github.com/pingcap/tidb/util/memoryusagealarm.(*memoryUsageAlarm).doRecord(0x1400fc43f28, 0x357354000?, 0x0?, {0x107fc2130, 0x1400fd42540}, 0x1)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/memoryusagealarm/memoryusagealarm.go:221 +0x954
+github.com/pingcap/tidb/util/memoryusagealarm.(*memoryUsageAlarm).alarm4ExcessiveMemUsage(0x1400fc43f28, {0x107fc2130, 0x1400fd42540})
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/memoryusagealarm/memoryusagealarm.go:159 +0x394
+github.com/pingcap/tidb/util/memoryusagealarm.(*Handle).Run(0x14000858480)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/memoryusagealarm/memoryusagealarm.go:67 +0xe8
+created by main.createServer
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/tidb-server/main.go:748 +0x414
+
+goroutine 1 [chan receive, 73 minutes]:
+github.com/pingcap/tidb/server.(*Server).Run(0x1400fd42540)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/server.go:371 +0x20c
+main.main()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/tidb-server/main.go:225 +0x3d0
+
+goroutine 51 [select, 73 minutes]:
+github.com/pingcap/badger.(*blobGCHandler).run(0x14000e00100, 0x14000d20018)
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/blob.go:468 +0xa0
+created by github.com/pingcap/badger.(*blobManager).Open
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/blob.go:292 +0x4e4
+
+goroutine 40 [select]:
+go.opencensus.io/stats/view.(*worker).start(0x14000516680)
+	/Users/arenatlx/go/pkg/mod/go.opencensus.io@v0.23.1-0.20220331163232-052120675fac/stats/view/worker.go:292 +0x88
+created by go.opencensus.io/stats/view.init.0
+	/Users/arenatlx/go/pkg/mod/go.opencensus.io@v0.23.1-0.20220331163232-052120675fac/stats/view/worker.go:34 +0xa4
+
+goroutine 41 [chan receive]:
+github.com/golang/glog.(*loggingT).flushDaemon(0x0?)
+	/Users/arenatlx/go/pkg/mod/github.com/golang/glog@v1.0.0/glog.go:882 +0x5c
+created by github.com/golang/glog.init.0
+	/Users/arenatlx/go/pkg/mod/github.com/golang/glog@v1.0.0/glog.go:410 +0x1f0
+
+goroutine 268 [select]:
+github.com/pingcap/tidb/util/cpuprofile.(*parallelCPUProfiler).profilingLoop(0x140001149c0)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/cpuprofile/cpuprofile.go:164 +0xcc
+github.com/pingcap/tidb/util.WithRecovery(0x0?, 0x140008426c0?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/misc.go:96 +0x50
+created by github.com/pingcap/tidb/util/cpuprofile.(*parallelCPUProfiler).start
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/cpuprofile/cpuprofile.go:111 +0x258
+
+goroutine 269 [chan receive]:
+github.com/pingcap/tidb/util/systimemon.StartMonitor(0x107f6a620, 0x107f69bd0, 0x1400083af80)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/systimemon/systime_mon.go:32 +0x148
+created by main.setupMetrics
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/tidb-server/main.go:770 +0x12c
+
+goroutine 270 [select]:
+github.com/pingcap/badger.(*DB).updateSize(0x0?, 0x140008583f0)
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/db.go:1039 +0xd4
+created by github.com/pingcap/badger.Open
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/db.go:328 +0xb3c
+
+goroutine 271 [select]:
+github.com/pingcap/badger/epoch.(*ResourceManager).collectLoop(0x0?, 0x14000858420)
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/epoch/manager.go:101 +0xa8
+created by github.com/pingcap/badger/epoch.NewResourceManager
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/epoch/manager.go:79 +0xe0
+
+goroutine 272 [select, 73 minutes]:
+github.com/pingcap/badger.Open.func4()
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/db.go:342 +0x148
+created by github.com/pingcap/badger.Open
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/db.go:339 +0xddc
+
+goroutine 52 [select]:
+github.com/pingcap/badger.(*levelsController).runWorker(0x14000d920e0, 0x14000d20048, 0x0)
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/levels.go:212 +0x184
+created by github.com/pingcap/badger.(*levelsController).startCompact
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/levels.go:180 +0x64
+
+goroutine 53 [select]:
+github.com/pingcap/badger.(*levelsController).runWorker(0x14000d920e0, 0x14000d20048, 0x0)
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/levels.go:212 +0x184
+created by github.com/pingcap/badger.(*levelsController).startCompact
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/levels.go:180 +0x64
+
+goroutine 54 [select]:
+github.com/pingcap/badger.(*levelsController).runWorker(0x14000d920e0, 0x14000d20048, 0x1)
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/levels.go:212 +0x184
+created by github.com/pingcap/badger.(*levelsController).startCompact
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/levels.go:180 +0x64
+
+goroutine 55 [chan receive, 73 minutes]:
+github.com/pingcap/badger.(*DB).runFlushMemTable(0x14000850d80, 0x0?)
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/db.go:920 +0x9c
+created by github.com/pingcap/badger.Open
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/db.go:361 +0x10f0
+
+goroutine 405 [select]:
+github.com/pingcap/tidb/util/topsql/reporter.(*RemoteTopSQLReporter).reportWorker(0x1400055f950)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/topsql/reporter/reporter.go:261 +0xb0
+created by github.com/pingcap/tidb/util/topsql/reporter.(*RemoteTopSQLReporter).Start
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/topsql/reporter/reporter.go:111 +0xb0
+
+goroutine 404 [select]:
+github.com/pingcap/tidb/util/topsql/reporter.(*RemoteTopSQLReporter).collectWorker(0x1400055f950)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/topsql/reporter/reporter.go:175 +0x124
+created by github.com/pingcap/tidb/util/topsql/reporter.(*RemoteTopSQLReporter).Start
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/topsql/reporter/reporter.go:110 +0x6c
+
+goroutine 273 [select, 4 minutes]:
+github.com/pingcap/badger.(*writeWorker).runWriteVLog(0x14000da20a0, 0x14000858018)
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/writer.go:94 +0xc0
+created by github.com/pingcap/badger.startWriteWorker
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/writer.go:64 +0x20c
+
+goroutine 274 [chan receive, 4 minutes, locked to thread]:
+github.com/pingcap/badger.(*writeWorker).runWriteLSM(0x14000da20a0, 0x140004c0948?)
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/writer.go:141 +0x110
+created by github.com/pingcap/badger.startWriteWorker
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/writer.go:65 +0x264
+
+goroutine 275 [chan receive, 4 minutes]:
+github.com/pingcap/badger.(*writeWorker).runMergeLSM(0x0?, 0x0?)
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/writer.go:154 +0x88
+created by github.com/pingcap/badger.startWriteWorker
+	/Users/arenatlx/go/pkg/mod/github.com/pingcap/badger@v1.5.1-0.20220314162537-ab58fbf40580/writer.go:66 +0x2bc
+
+goroutine 276 [select, 4 minutes]:
+github.com/pingcap/tidb/store/mockstore/unistore/tikv.writeDBWorker.run({0x140001154a0?, 0x14000e01080?})
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/store/mockstore/unistore/tikv/write.go:96 +0xe0
+created by github.com/pingcap/tidb/store/mockstore/unistore/tikv.(*dbWriter).Open
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/store/mockstore/unistore/tikv/write.go:199 +0xcc
+
+goroutine 277 [select, 4 minutes]:
+github.com/pingcap/tidb/store/mockstore/unistore/tikv.writeLockWorker.run({0x14000115500?, 0x14000e01080?})
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/store/mockstore/unistore/tikv/write.go:148 +0xf4
+created by github.com/pingcap/tidb/store/mockstore/unistore/tikv.(*dbWriter).Open
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/store/mockstore/unistore/tikv/write.go:206 +0x164
+
+goroutine 278 [select]:
+github.com/pingcap/tidb/store/mockstore/unistore/tikv.(*MVCCStore).runUpdateSafePointLoop(0x14000e0be00)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/store/mockstore/unistore/tikv/mvcc.go:1742 +0x1a8
+created by github.com/pingcap/tidb/store/mockstore/unistore/tikv.NewMVCCStore
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/store/mockstore/unistore/tikv/mvcc.go:87 +0x338
+
+goroutine 279 [select, 4 minutes]:
+github.com/pingcap/tidb/store/mockstore/unistore/tikv.(*MVCCStore).StartDeadlockDetection.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/store/mockstore/unistore/tikv/mvcc.go:1415 +0x6c
+created by github.com/pingcap/tidb/store/mockstore/unistore/tikv.(*MVCCStore).StartDeadlockDetection
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/store/mockstore/unistore/tikv/mvcc.go:1413 +0xbc
+
+goroutine 280 [select]:
+github.com/tikv/client-go/v2/oracle/oracles.(*pdOracle).updateTS(0x14000b381c0, {0x107fa27e0, 0x140000580a8}, 0x0?)
+	/Users/arenatlx/go/pkg/mod/github.com/tikv/client-go/v2@v2.0.1-0.20220923061703-33efe476e022/oracle/oracles/pd.go:229 +0xd8
+created by github.com/tikv/client-go/v2/oracle/oracles.NewPdOracle
+	/Users/arenatlx/go/pkg/mod/github.com/tikv/client-go/v2@v2.0.1-0.20220923061703-33efe476e022/oracle/oracles/pd.go:77 +0x124
+
+goroutine 281 [select]:
+github.com/tikv/client-go/v2/internal/locate.(*RegionCache).asyncCheckAndResolveLoop(0x14000c22d00, 0x0?)
+	/Users/arenatlx/go/pkg/mod/github.com/tikv/client-go/v2@v2.0.1-0.20220923061703-33efe476e022/internal/locate/region_cache.go:448 +0xb0
+created by github.com/tikv/client-go/v2/internal/locate.NewRegionCache
+	/Users/arenatlx/go/pkg/mod/github.com/tikv/client-go/v2@v2.0.1-0.20220923061703-33efe476e022/internal/locate/region_cache.go:419 +0x31c
+
+goroutine 282 [select]:
+github.com/tikv/client-go/v2/tikv.(*KVStore).runSafePointChecker(0x14000110500)
+	/Users/arenatlx/go/pkg/mod/github.com/tikv/client-go/v2@v2.0.1-0.20220923061703-33efe476e022/tikv/kv.go:234 +0xd0
+created by github.com/tikv/client-go/v2/tikv.NewKVStore
+	/Users/arenatlx/go/pkg/mod/github.com/tikv/client-go/v2@v2.0.1-0.20220923061703-33efe476e022/tikv/kv.go:189 +0x3d0
+
+goroutine 283 [select]:
+github.com/tikv/client-go/v2/tikv.(*KVStore).safeTSUpdater(0x14000110500)
+	/Users/arenatlx/go/pkg/mod/github.com/tikv/client-go/v2@v2.0.1-0.20220923061703-33efe476e022/tikv/kv.go:530 +0x188
+created by github.com/tikv/client-go/v2/tikv.NewKVStore
+	/Users/arenatlx/go/pkg/mod/github.com/tikv/client-go/v2@v2.0.1-0.20220923061703-33efe476e022/tikv/kv.go:190 +0x414
+
+goroutine 284 [select, 2 minutes]:
+github.com/dgraph-io/ristretto.(*lfuPolicy).processItems(0x14000e01300)
+	/Users/arenatlx/go/pkg/mod/github.com/dgraph-io/ristretto@v0.1.1-0.20220403145359-8e850b710d6d/policy.go:67 +0x64
+created by github.com/dgraph-io/ristretto.newPolicy
+	/Users/arenatlx/go/pkg/mod/github.com/dgraph-io/ristretto@v0.1.1-0.20220403145359-8e850b710d6d/policy.go:51 +0x150
+
+goroutine 285 [select]:
+github.com/dgraph-io/ristretto.(*Cache).processItems(0x14000b385b0)
+	/Users/arenatlx/go/pkg/mod/github.com/dgraph-io/ristretto@v0.1.1-0.20220403145359-8e850b710d6d/cache.go:476 +0xf8
+created by github.com/dgraph-io/ristretto.NewCache
+	/Users/arenatlx/go/pkg/mod/github.com/dgraph-io/ristretto@v0.1.1-0.20220403145359-8e850b710d6d/cache.go:213 +0x750
+
+goroutine 287 [select, 73 minutes]:
+github.com/pingcap/tidb/ddl.(*ddl).limitDDLJobs(0x14000b09d00)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/ddl/ddl_worker.go:278 +0xe0
+github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:33 +0x58
+created by github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:31 +0x84
+
+goroutine 288 [select, 73 minutes]:
+github.com/pingcap/tidb/ddl.(*delRange).startEmulator(0x14000eff560)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/ddl/delete_range.go:160 +0x108
+created by github.com/pingcap/tidb/ddl.(*delRange).start
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/ddl/delete_range.go:142 +0x78
+
+goroutine 289 [select]:
+github.com/pingcap/tidb/ddl.(*ddl).startDispatchLoop(0x14000b09d00)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/ddl/job_table.go:181 +0x3bc
+github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:33 +0x58
+created by github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:31 +0x84
+
+goroutine 290 [select]:
+github.com/pingcap/tidb/ddl.(*worker).start(0x14000eec800, 0x140001f7200)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/ddl/ddl_worker.go:194 +0x26c
+created by github.com/pingcap/tidb/ddl.(*ddl).prepareWorkers4legacyDDL
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/ddl/ddl.go:637 +0x204
+
+goroutine 291 [select]:
+github.com/pingcap/tidb/ddl.(*worker).start(0x14000eec780, 0x140001f7200)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/ddl/ddl_worker.go:194 +0x26c
+created by github.com/pingcap/tidb/ddl.(*ddl).prepareWorkers4legacyDDL
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/ddl/ddl.go:637 +0x204
+
+goroutine 306 [select]:
+github.com/pingcap/tidb/ddl.(*ddl).PollTiFlashRoutine(0x14000b09d00)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/ddl/ddl_tiflash_api.go:697 +0x210
+github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:33 +0x58
+created by github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:31 +0x84
+
+goroutine 307 [select, 2 minutes]:
+github.com/pingcap/tidb/domain.(*Domain).loadSchemaInLoop(0x140007298c0, {0x107fa27a8, 0x14000c8c1c0}, 0x0?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:741 +0x148
+created by github.com/pingcap/tidb/domain.(*Domain).Init
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1031 +0xc80
+
+goroutine 308 [select]:
+github.com/pingcap/tidb/domain.(*Domain).mdlCheckLoop(0x140007298c0)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:658 +0xb0
+github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:33 +0x58
+created by github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:31 +0x84
+
+goroutine 309 [select, 4 minutes]:
+github.com/pingcap/tidb/domain.(*Domain).topNSlowQueryLoop(0x140007298c0)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:527 +0x104
+created by github.com/pingcap/tidb/domain.(*Domain).Init
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1035 +0xd30
+
+goroutine 310 [select]:
+github.com/pingcap/tidb/domain.(*Domain).infoSyncerKeeper(0x140007298c0)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:559 +0x10c
+created by github.com/pingcap/tidb/domain.(*Domain).Init
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1036 +0xd74
+
+goroutine 311 [select, 73 minutes]:
+github.com/pingcap/tidb/domain.(*Domain).globalConfigSyncerKeeper(0x140007298c0)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:582 +0xa4
+created by github.com/pingcap/tidb/domain.(*Domain).Init
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1037 +0xdb8
+
+goroutine 312 [select]:
+github.com/pingcap/tidb/domain.(*Domain).topologySyncerKeeper(0x140007298c0)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:605 +0x108
+created by github.com/pingcap/tidb/domain.(*Domain).Init
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1040 +0xe14
+
+goroutine 313 [select]:
+github.com/pingcap/tidb/domain.(*Domain).closestReplicaReadCheckLoop(0x140007298c0, {0x107fa27a8?, 0x14000c8c1c0?}, {0x107fd6dd0, 0x140001e0fa0})
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1091 +0x224
+created by github.com/pingcap/tidb/domain.(*Domain).Init
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1044 +0xedc
+
+goroutine 325 [select]:
+github.com/pingcap/tidb/domain.(*Domain).handleEvolvePlanTasksLoop.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1454 +0xc8
+created by github.com/pingcap/tidb/domain.(*Domain).handleEvolvePlanTasksLoop
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1447 +0xf4
+
+goroutine 406 [select]:
+github.com/pingcap/tidb/util/topsql/reporter.(*SingleTargetDataSink).run(0x140000b34a0)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/topsql/reporter/single_target.go:114 +0xd0
+github.com/pingcap/tidb/util/topsql/reporter.(*SingleTargetDataSink).recoverRun(0x140000b34a0)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/topsql/reporter/single_target.go:95 +0x54
+created by github.com/pingcap/tidb/util/topsql/reporter.(*SingleTargetDataSink).Start
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/topsql/reporter/single_target.go:80 +0x260
+
+goroutine 336 [syscall, 73 minutes]:
+os/signal.signal_recv()
+	/opt/homebrew/Cellar/go/1.19/libexec/src/runtime/sigqueue.go:149 +0x2c
+os/signal.loop()
+	/opt/homebrew/Cellar/go/1.19/libexec/src/os/signal/signal_unix.go:23 +0x1c
+created by os/signal.Notify.func1.1
+	/opt/homebrew/Cellar/go/1.19/libexec/src/os/signal/signal.go:151 +0x2c
+
+goroutine 403 [select]:
+github.com/pingcap/tidb/util/topsql/collector.(*SQLCPUCollector).collectSQLCPULoop(0x14000515dc0)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/topsql/collector/cpu.go:120 +0x174
+created by github.com/pingcap/tidb/util/topsql/collector.(*SQLCPUCollector).Start
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/topsql/collector/cpu.go:82 +0xe0
+
+goroutine 337 [chan receive, 73 minutes]:
+github.com/pingcap/tidb/util/signal.SetupSignalHandler.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/signal/signal_posix.go:37 +0x4c
+created by github.com/pingcap/tidb/util/signal.SetupSignalHandler
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/signal/signal_posix.go:34 +0xa8
+
+goroutine 324 [select]:
+github.com/pingcap/tidb/domain.(*Domain).globalBindHandleWorkerLoop.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1416 +0x11c
+created by github.com/pingcap/tidb/domain.(*Domain).globalBindHandleWorkerLoop
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1403 +0xb4
+
+goroutine 383 [select, 14 minutes]:
+github.com/pingcap/tidb/domain.(*Domain).gcAnalyzeHistory(0x140007298c0, {0x107fc0ce0, 0x1400fd559e0})
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1810 +0xd8
+github.com/pingcap/tidb/domain.(*Domain).UpdateTableStatsLoop.func3()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1613 +0x28
+github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:33 +0x58
+created by github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:31 +0x84
+
+goroutine 372 [select, 4 minutes]:
+github.com/pingcap/tidb/domain.(*Domain).LoadPrivilegeLoop.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1281 +0xe0
+created by github.com/pingcap/tidb/domain.(*Domain).LoadPrivilegeLoop
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1272 +0x254
+
+goroutine 384 [select, 73 minutes]:
+github.com/pingcap/tidb/statistics/handle.(*Handle).drainColTask(0x1400fd6a360, 0x140000b4840)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:393 +0x88
+github.com/pingcap/tidb/statistics/handle.(*Handle).HandleOneTask(0x14000684990?, 0x0?, 0x0?, {0x132eced20, 0x14000536280}, 0x0?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:203 +0x84
+github.com/pingcap/tidb/statistics/handle.(*Handle).SubLoadWorker(0x1400fd6a360, {0x1080094e0?, 0x14000536280}, 0x107fa2850?, 0x1400fd54510?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:179 +0xc4
+created by github.com/pingcap/tidb/domain.(*Domain).StartLoadStatsSubWorkers
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1623 +0x194
+
+goroutine 381 [select]:
+github.com/pingcap/tidb/domain.(*Domain).updateStatsWorker(0x140007298c0, {0x1080094e0?, 0x14000536000?}, {0x107fc0ce0, 0x1400fd559e0})
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1732 +0x1b4
+github.com/pingcap/tidb/domain.(*Domain).UpdateTableStatsLoop.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1611 +0x30
+github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:33 +0x58
+created by github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:31 +0x84
+
+goroutine 402 [chan receive, 73 minutes]:
+github.com/pingcap/tidb/util/signal.SetupSignalHandler.func2()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/signal/signal_posix.go:53 +0x34
+created by github.com/pingcap/tidb/util/signal.SetupSignalHandler
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/signal/signal_posix.go:52 +0x17c
+
+goroutine 382 [select]:
+github.com/pingcap/tidb/domain.(*Domain).autoAnalyzeWorker(0x140007298c0, {0x107fc0ce0, 0x1400fd559e0})
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1789 +0xd0
+github.com/pingcap/tidb/domain.(*Domain).UpdateTableStatsLoop.func2()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1612 +0x28
+github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:33 +0x58
+created by github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:31 +0x84
+
+goroutine 355 [select]:
+github.com/pingcap/tidb/domain.(*Domain).LoadSysVarCacheLoop.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1331 +0xe0
+created by github.com/pingcap/tidb/domain.(*Domain).LoadSysVarCacheLoop
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1322 +0x178
+
+goroutine 380 [select]:
+github.com/pingcap/tidb/domain.(*Domain).loadStatsWorker(0x140007298c0)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1663 +0x388
+github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:33 +0x58
+created by github.com/pingcap/tidb/util.(*WaitGroupWrapper).Run
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/wait_group_wrapper.go:31 +0x84
+
+goroutine 385 [select, 73 minutes]:
+github.com/pingcap/tidb/statistics/handle.(*Handle).drainColTask(0x1400fd6a360, 0x140000b4840)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:393 +0x88
+github.com/pingcap/tidb/statistics/handle.(*Handle).HandleOneTask(0x14000684800?, 0x0?, 0x0?, {0x132eced20, 0x14000536780}, 0x0?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:203 +0x84
+github.com/pingcap/tidb/statistics/handle.(*Handle).SubLoadWorker(0x1400fd6a360, {0x1080094e0?, 0x14000536780}, 0x107fa2850?, 0x1400ffac870?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:179 +0xc4
+created by github.com/pingcap/tidb/domain.(*Domain).StartLoadStatsSubWorkers
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1623 +0x194
+
+goroutine 386 [select, 73 minutes]:
+github.com/pingcap/tidb/statistics/handle.(*Handle).drainColTask(0x1400fd6a360, 0x140000b4840)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:393 +0x88
+github.com/pingcap/tidb/statistics/handle.(*Handle).HandleOneTask(0x1400fc05f08?, 0x104d947d0?, 0x0?, {0x132eced20, 0x14000536a00}, 0x106cd21a8?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:203 +0x84
+github.com/pingcap/tidb/statistics/handle.(*Handle).SubLoadWorker(0x1400fd6a360, {0x1080094e0?, 0x14000536a00}, 0x106cd2180?, 0x0?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:179 +0xc4
+created by github.com/pingcap/tidb/domain.(*Domain).StartLoadStatsSubWorkers
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1623 +0x194
+
+goroutine 387 [select, 73 minutes]:
+github.com/pingcap/tidb/statistics/handle.(*Handle).drainColTask(0x1400fd6a360, 0x140000b4840)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:393 +0x88
+github.com/pingcap/tidb/statistics/handle.(*Handle).HandleOneTask(0x0?, 0x0?, 0x0?, {0x132eced20, 0x14000536c80}, 0x0?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:203 +0x84
+github.com/pingcap/tidb/statistics/handle.(*Handle).SubLoadWorker(0x1400fd6a360, {0x1080094e0?, 0x14000536c80}, 0x107fa27a8?, 0x14000c8c1c0?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:179 +0xc4
+created by github.com/pingcap/tidb/domain.(*Domain).StartLoadStatsSubWorkers
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1623 +0x194
+
+goroutine 388 [select, 73 minutes]:
+github.com/pingcap/tidb/statistics/handle.(*Handle).drainColTask(0x1400fd6a360, 0x140000b4840)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:393 +0x88
+github.com/pingcap/tidb/statistics/handle.(*Handle).HandleOneTask(0x0?, 0x0?, 0x0?, {0x132eced20, 0x14000537900}, 0x0?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:203 +0x84
+github.com/pingcap/tidb/statistics/handle.(*Handle).SubLoadWorker(0x1400fd6a360, {0x1080094e0?, 0x14000537900}, 0x104d85864?, 0x14000eec800?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/statistics/handle/handle_hist.go:179 +0xc4
+created by github.com/pingcap/tidb/domain.(*Domain).StartLoadStatsSubWorkers
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1623 +0x194
+
+goroutine 389 [select, 4 minutes]:
+github.com/pingcap/tidb/domain.(*Domain).DumpFileGcCheckerLoop.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1539 +0xc4
+created by github.com/pingcap/tidb/domain.(*Domain).DumpFileGcCheckerLoop
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1530 +0x74
+
+goroutine 390 [select, 4 minutes]:
+github.com/pingcap/tidb/domain.(*Domain).LoadSigningCertLoop.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1904 +0xac
+created by github.com/pingcap/tidb/domain.(*Domain).LoadSigningCertLoop
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/domain/domain.go:1897 +0x74
+
+goroutine 391 [select]:
+github.com/pingcap/tidb/util/expensivequery.(*Handle).Run(0x14000858468)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/expensivequery/expensivequery.go:56 +0x128
+created by main.createServer
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/tidb-server/main.go:747 +0x3a4
+
+goroutine 393 [select]:
+github.com/pingcap/tidb/util/servermemorylimit.(*Handle).Run(0x14000858498)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/servermemorylimit/servermemorylimit.go:56 +0x124
+created by main.createServer
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/tidb-server/main.go:749 +0x484
+
+goroutine 407 [select]:
+github.com/pingcap/tidb/util/topsql/stmtstats.(*aggregator).run(0x1400055e360)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/topsql/stmtstats/aggregator.go:67 +0xbc
+created by github.com/pingcap/tidb/util/topsql/stmtstats.(*aggregator).start
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/topsql/stmtstats/aggregator.go:56 +0xec
+
+goroutine 408 [IO wait, 73 minutes]:
+internal/poll.runtime_pollWait(0x13303b648, 0x72)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/runtime/netpoll.go:305 +0xa0
+internal/poll.(*pollDesc).wait(0x14000164c80?, 0x106ee5f2c?, 0x0)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_poll_runtime.go:84 +0x28
+internal/poll.(*pollDesc).waitRead(...)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Accept(0x14000164c80)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_unix.go:614 +0x1d0
+net.(*netFD).accept(0x14000164c80)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/fd_unix.go:172 +0x28
+net.(*TCPListener).accept(0x140006e3e60)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/tcpsock_posix.go:142 +0x28
+net.(*TCPListener).Accept(0x140006e3e60)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/tcpsock.go:288 +0x2c
+github.com/soheilhy/cmux.(*cMux).Serve(0x140101baa50)
+	/Users/arenatlx/go/pkg/mod/github.com/soheilhy/cmux@v0.1.5/cmux.go:170 +0x84
+github.com/pingcap/tidb/server.(*Server).startStatusServerAndRPCServer(0x1400fd42540, 0x14010180bc0)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/http_status.go:474 +0x498
+github.com/pingcap/tidb/server.(*Server).startHTTPServer(0x1400fd42540)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/http_status.go:447 +0x12f4
+created by github.com/pingcap/tidb/server.(*Server).startStatusHTTP
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/http_status.go:62 +0x60
+
+goroutine 409 [IO wait, 73 minutes]:
+internal/poll.runtime_pollWait(0x13303b828, 0x72)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/runtime/netpoll.go:305 +0xa0
+internal/poll.(*pollDesc).wait(0x14000164a80?, 0x0?, 0x0)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_poll_runtime.go:84 +0x28
+internal/poll.(*pollDesc).waitRead(...)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Accept(0x14000164a80)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_unix.go:614 +0x1d0
+net.(*netFD).accept(0x14000164a80)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/fd_unix.go:172 +0x28
+net.(*TCPListener).accept(0x140006e3e48)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/tcpsock_posix.go:142 +0x28
+net.(*TCPListener).Accept(0x140006e3e48)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/tcpsock.go:288 +0x2c
+github.com/pingcap/tidb/server.(*Server).startNetworkListener(0x1400fd42540, {0x107f9f6e0, 0x140006e3e48}, 0x0, 0x0?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/server.go:384 +0x78
+created by github.com/pingcap/tidb/server.(*Server).Run
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/server.go:369 +0x168
+
+goroutine 410 [IO wait, 73 minutes]:
+internal/poll.runtime_pollWait(0x13303b738, 0x72)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/runtime/netpoll.go:305 +0xa0
+internal/poll.(*pollDesc).wait(0x14000164b00?, 0x1?, 0x0)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_poll_runtime.go:84 +0x28
+internal/poll.(*pollDesc).waitRead(...)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Accept(0x14000164b00)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_unix.go:614 +0x1d0
+net.(*netFD).accept(0x14000164b00)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/fd_unix.go:172 +0x28
+net.(*UnixListener).accept(0x0?)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/unixsock_posix.go:166 +0x20
+net.(*UnixListener).Accept(0x1400fd55c50)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/unixsock.go:260 +0x2c
+github.com/pingcap/tidb/server.(*Server).startNetworkListener(0x1400fd42540, {0x107f9f710, 0x1400fd55c50}, 0x1, 0x0?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/server.go:384 +0x78
+created by github.com/pingcap/tidb/server.(*Server).Run
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/server.go:370 +0x1fc
+
+goroutine 321 [select, 73 minutes]:
+github.com/soheilhy/cmux.muxListener.Accept(...)
+	/Users/arenatlx/go/pkg/mod/github.com/soheilhy/cmux@v0.1.5/cmux.go:262
+google.golang.org/grpc.(*Server).Serve(0x140005bddc0, {0x107fa0a90, 0x140101a92a0})
+	/Users/arenatlx/go/pkg/mod/google.golang.org/grpc@v1.45.0/server.go:779 +0x3c0
+github.com/pingcap/tidb/server.(*Server).startStatusServerAndRPCServer.func1()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/http_status.go:465 +0x2c
+github.com/pingcap/tidb/util.WithRecovery(0x1400fd42540?, 0x1400fb7e540?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/misc.go:96 +0x50
+created by github.com/pingcap/tidb/server.(*Server).startStatusServerAndRPCServer
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/http_status.go:464 +0x3e0
+
+goroutine 418 [select, 73 minutes]:
+github.com/soheilhy/cmux.muxListener.Accept(...)
+	/Users/arenatlx/go/pkg/mod/github.com/soheilhy/cmux@v0.1.5/cmux.go:262
+net/http.(*Server).Serve(0x1400fb4a780, {0x107fa0a90, 0x140101a9280})
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/http/server.go:3070 +0x30c
+github.com/pingcap/tidb/server.(*Server).startStatusServerAndRPCServer.func2()
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/http_status.go:470 +0x2c
+github.com/pingcap/tidb/util.WithRecovery(0x0?, 0x0?)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/util/misc.go:96 +0x50
+created by github.com/pingcap/tidb/server.(*Server).startStatusServerAndRPCServer
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/http_status.go:469 +0x490
+
+goroutine 766 [IO wait, 54 minutes]:
+internal/poll.runtime_pollWait(0x13303b558, 0x72)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/runtime/netpoll.go:305 +0xa0
+internal/poll.(*pollDesc).wait(0x14010043e80?, 0x140108d4000?, 0x0)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_poll_runtime.go:84 +0x28
+internal/poll.(*pollDesc).waitRead(...)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0x14010043e80, {0x140108d4000, 0x4000, 0x4000})
+	/opt/homebrew/Cellar/go/1.19/libexec/src/internal/poll/fd_unix.go:167 +0x1e0
+net.(*netFD).Read(0x14010043e80, {0x140108d4000?, 0x1401260f338?, 0x104df5c00?})
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/fd_posix.go:55 +0x28
+net.(*conn).Read(0x14010130048, {0x140108d4000?, 0x1401260f398?, 0x72?})
+	/opt/homebrew/Cellar/go/1.19/libexec/src/net/net.go:183 +0x34
+bufio.(*Reader).Read(0x1400fff4600, {0x1401729f380, 0x4, 0x1401260f388?})
+	/opt/homebrew/Cellar/go/1.19/libexec/src/bufio/bufio.go:237 +0x1e0
+github.com/pingcap/tidb/server.bufferedReadConn.Read(...)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/buffered_read_conn.go:31
+io.ReadAtLeast({0x107f7c280, 0x1400fc7b380}, {0x1401729f380, 0x4, 0x4}, 0x4)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/io/io.go:332 +0xa0
+io.ReadFull(...)
+	/opt/homebrew/Cellar/go/1.19/libexec/src/io/io.go:351
+github.com/pingcap/tidb/server.(*packetIO).readOnePacket(0x14010806a80)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/packetio.go:93 +0xb4
+github.com/pingcap/tidb/server.(*packetIO).readPacket(0x14010806a80)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/packetio.go:135 +0x58
+github.com/pingcap/tidb/server.(*clientConn).readPacket(0x14010457340)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/conn.go:430 +0x60
+github.com/pingcap/tidb/server.(*clientConn).Run(0x14010457340, {0x107fa2850, 0x14010806ae0})
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/conn.go:1068 +0x170
+github.com/pingcap/tidb/server.(*Server).onConn(0x1400fd42540, 0x14010457340)
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/server.go:563 +0x5c4
+created by github.com/pingcap/tidb/server.(*Server).startNetworkListener
+	/Users/arenatlx/go/src/github.com/pingcap/tidb/server/server.go:454 +0x558

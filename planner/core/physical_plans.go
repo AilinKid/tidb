@@ -16,6 +16,9 @@ package core
 
 import (
 	"fmt"
+	ssg "github.com/AilinKid/substrait-go/proto"
+	"github.com/AilinKid/substrait-go/proto/extensions"
+	"github.com/pingcap/tidb/parser/mysql"
 	"strconv"
 	"unsafe"
 
@@ -975,6 +978,159 @@ type PhysicalProjection struct {
 	Exprs                []expression.Expression
 	CalculateNoDelay     bool
 	AvoidColumnEvaluator bool
+}
+
+func getSubStraitType(tp byte) string {
+	if tp == mysql.TypeLong {
+		return "i32"
+	}
+	if tp == mysql.TypeLonglong {
+		return "i64"
+	}
+	if tp == mysql.TypeDouble {
+		return "fp64"
+	}
+	panic("not supproted type")
+}
+
+// ToSubStraitPB implements the ssg interface.
+func (p *PhysicalProjection) ToSubStraitPB(ctx sessionctx.Context, storeType kv.StoreType) (*ssg.Rel, error) {
+	childRel, err := p.children[0].ToSubStraitPB(ctx, storeType)
+	if err != nil {
+		return nil, err
+	}
+	// extract function map (assume there are all simple functions)
+	funcSigatures := []string{}
+	for _, expr := range p.Exprs {
+		if scalarF, ok := expr.(*expression.ScalarFunction); ok {
+			funcSig := ""
+			if scalarF.FuncName.L == ast.LE {
+				funcSig = "lte"
+			}
+			if scalarF.FuncName.L == ast.LT {
+				funcSig = "lt"
+			}
+			if scalarF.FuncName.L == ast.GE {
+				funcSig = "gte"
+			}
+			if scalarF.FuncName.L == ast.GT {
+				funcSig = "gt"
+			}
+			funcSigatures = append(funcSigatures, funcSig+":"+getSubStraitType(scalarF.GetArgs()[0].GetType().GetType())+"_"+getSubStraitType(scalarF.GetArgs()[1].GetType().GetType()))
+		}
+	}
+	mapFuncSig := make(map[string]int, len(funcSigatures))
+	cnt := 0
+	for _, sig := range funcSigatures {
+		if _, ok := mapFuncSig[sig]; !ok {
+			mapFuncSig[sig] = cnt
+			cnt++
+		}
+	}
+	sspb := &ssg.ProjectRel{
+		Common: &ssg.RelCommon{
+			EmitKind: &ssg.RelCommon_Direct_{
+				Direct: &ssg.RelCommon_Direct{},
+			},
+		},
+		Input: childRel,
+		Expressions: []*ssg.Expression{
+			{
+				RexType: &ssg.Expression_ScalarFunction_{
+					ScalarFunction: &ssg.Expression_ScalarFunction{
+						// function anchor
+						FunctionReference: uint32(mapFuncSig[funcSigatures[0]]),
+						// function args
+						Arguments: []*ssg.FunctionArgument{
+							&ssg.FunctionArgument{
+								ArgType: &ssg.FunctionArgument_Value{
+									Value: &ssg.Expression{
+										RexType: &ssg.Expression_Selection{
+											Selection: &ssg.Expression_FieldReference{
+												ReferenceType: &ssg.Expression_FieldReference_DirectReference{
+													DirectReference: &ssg.Expression_ReferenceSegment{
+														ReferenceType: &ssg.Expression_ReferenceSegment_StructField_{
+															StructField: &ssg.Expression_ReferenceSegment_StructField{
+																// col offset from child chunk
+																Field: int32(0),
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							{
+								ArgType: &ssg.FunctionArgument_Value{
+									Value: &ssg.Expression{
+										RexType: &ssg.Expression_Selection{
+											Selection: &ssg.Expression_FieldReference{
+												ReferenceType: &ssg.Expression_FieldReference_DirectReference{
+													DirectReference: &ssg.Expression_ReferenceSegment{
+														ReferenceType: &ssg.Expression_ReferenceSegment_StructField_{
+															StructField: &ssg.Expression_ReferenceSegment_StructField{
+																// col offset from child chunk
+																Field: int32(1),
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						OutputType: &ssg.Type{
+							Kind: &ssg.Type_Bool{
+								Bool: &ssg.Type_Boolean{
+									Nullability: ssg.Type_NULLABILITY_NULLABLE,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	// wrap it as Plan
+	finalPlan := ssg.Plan{
+		ExtensionUris: []*extensions.SimpleExtensionURI{
+			{
+				ExtensionUriAnchor: uint32(1),
+				Uri:                "whatever",
+			},
+		},
+		Extensions: []*extensions.SimpleExtensionDeclaration{
+			{
+				MappingType: &extensions.SimpleExtensionDeclaration_ExtensionFunction_{
+					ExtensionFunction: &extensions.SimpleExtensionDeclaration_ExtensionFunction{
+						ExtensionUriReference: 1,
+						FunctionAnchor:        uint32(mapFuncSig[funcSigatures[0]]),
+						Name:                  funcSigatures[0],
+					},
+				},
+			},
+		},
+		Relations: []*ssg.PlanRel{
+			{
+				RelType: &ssg.PlanRel_Root{
+					Root: &ssg.RelRoot{
+						Input: &ssg.Rel{
+							RelType: &ssg.Rel_Project{Project: sspb},
+						},
+						Names: []string{"my_res"},
+					},
+				},
+			},
+		},
+	}
+	fmt.Println("tai", finalPlan.String())
+	return &ssg.Rel{
+		RelType: &ssg.Rel_Project{Project: sspb},
+	}, nil
 }
 
 // Clone implements PhysicalPlan interface.

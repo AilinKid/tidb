@@ -15,20 +15,25 @@
 package core
 
 import (
+	"fmt"
+	ssg "github.com/AilinKid/substrait-go/proto"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/expression/aggregation"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/parser/model"
+	"github.com/pingcap/tidb/parser/mysql"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/table"
 	"github.com/pingcap/tidb/table/tables"
 	"github.com/pingcap/tidb/tablecodec"
 	"github.com/pingcap/tidb/telemetry"
+	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util"
 	"github.com/pingcap/tidb/util/codec"
 	"github.com/pingcap/tidb/util/ranger"
 	"github.com/pingcap/tipb/go-tipb"
+	"strings"
 )
 
 // ToPB implements PhysicalPlan ToPB interface.
@@ -183,8 +188,99 @@ func (p *PhysicalLimit) ToPB(ctx sessionctx.Context, storeType kv.StoreType) (*t
 	return &tipb.Executor{Tp: tipb.ExecType_TypeLimit, Limit: limitExec, ExecutorId: &executorID}, nil
 }
 
+func mapSSGKind(tp types.FieldType) *ssg.Type {
+	hasNotNull := mysql.HasNotNullFlag(tp.GetFlag())
+	getNullability := func() ssg.Type_Nullability {
+		if !hasNotNull {
+			return ssg.Type_NULLABILITY_NULLABLE
+		}
+		return ssg.Type_NULLABILITY_REQUIRED
+	}
+	switch tp.GetType() {
+	case mysql.TypeLong:
+		return &ssg.Type{
+			Kind: &ssg.Type_I32_{
+				I32: &ssg.Type_I32{
+					// Some systems use type variations to describe different underlying representations of the same data type.
+					TypeVariationReference: 0,
+					Nullability:            getNullability(),
+				},
+			},
+		}
+	case mysql.TypeLonglong:
+		return &ssg.Type{
+			Kind: &ssg.Type_I64_{
+				I64: &ssg.Type_I64{
+					// Some systems use type variations to describe different underlying representations of the same data type.
+					TypeVariationReference: 0,
+					Nullability:            getNullability(),
+				},
+			},
+		}
+	case mysql.TypeVarchar:
+		return &ssg.Type{
+			Kind: &ssg.Type_String_{
+				String_: &ssg.Type_String{
+					// Some systems use type variations to describe different underlying representations of the same data type.
+					TypeVariationReference: 0,
+					Nullability:            getNullability(),
+				},
+			},
+		}
+	}
+	panic("not supported type by now")
+}
+
+func (p *PhysicalTableScan) getColumnNamesAndTypes() ([]string, []*ssg.Type) {
+	names := make([]string, 0, len(p.schema.Columns))
+	tps := make([]*ssg.Type, 0, len(p.schema.Columns))
+	for _, col := range p.schema.Columns {
+		for _, ci := range p.Columns {
+			if col.ID == ci.ID {
+				names = append(names, ci.Name.L)
+				tps = append(tps, mapSSGKind(ci.FieldType))
+				break
+			}
+		}
+	}
+	return names, tps
+}
+
+// ToSubStraitPB implements PhysicalPlan ToSubStraitPB interface.
+func (p *PhysicalTableScan) ToSubStraitPB(ctx sessionctx.Context, storeType kv.StoreType) (*ssg.Rel, error) {
+	names, tps := p.getColumnNamesAndTypes()
+	sspb := &ssg.ReadRel{
+		Common: &ssg.RelCommon{
+			EmitKind: &ssg.RelCommon_Direct_{Direct: &ssg.RelCommon_Direct{}},
+		},
+		BaseSchema: &ssg.NamedStruct{
+			Names: names,
+			Struct: &ssg.Type_Struct{
+				Types: tps,
+			},
+		},
+		// todo: add push filters here
+		Filter: nil,
+		// todo: add push projections here
+		Projection: nil,
+		ReadType: &ssg.ReadRel_NamedTable_{
+			NamedTable: &ssg.ReadRel_NamedTable{
+				Names: []string{p.Table.Name.L},
+			},
+		},
+	}
+	// wrap it as Rel
+	return &ssg.Rel{
+		RelType: &ssg.Rel_Read{Read: sspb},
+	}, nil
+}
+
 // ToPB implements PhysicalPlan ToPB interface.
 func (p *PhysicalTableScan) ToPB(ctx sessionctx.Context, storeType kv.StoreType) (*tipb.Executor, error) {
+	if strings.HasPrefix(p.SCtx().GetSessionVars().StmtCtx.OriginalSQL, "select * from t") {
+		str, _ := p.ToSubStraitPB(ctx, storeType)
+		fmt.Println(str)
+	}
 	if storeType == kv.TiFlash && p.Table.GetPartitionInfo() != nil && p.IsMPPOrBatchCop && p.ctx.GetSessionVars().StmtCtx.UseDynamicPartitionPrune() {
 		return p.partitionTableScanToPBForFlash(ctx)
 	}

@@ -16,6 +16,7 @@ package core
 
 import (
 	"fmt"
+	ssg "github.com/AilinKid/substrait-go/proto"
 	"math"
 	"strconv"
 	"unsafe"
@@ -379,6 +380,9 @@ type PhysicalPlan interface {
 
 	// MemoryUsage return the memory usage of PhysicalPlan
 	MemoryUsage() int64
+
+	// ToSubStraitPB change the physical plan to subStrait PB plan
+	ToSubStraitPB(ctx sessionctx.Context, storeType kv.StoreType) (*ssg.Rel, error)
 }
 
 // NewDefaultPlanCostOption returns PlanCostOption

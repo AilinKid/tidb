@@ -125,6 +125,7 @@ require (
 	cloud.google.com/go v0.100.2 // indirect
 	cloud.google.com/go/compute v1.5.0 // indirect
 	cloud.google.com/go/iam v0.1.1 // indirect
+	github.com/AilinKid/substrait-go v0.0.0-20221019063905-d0e7cc9207e7 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v0.20.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v0.8.1 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
@@ -206,6 +207,7 @@ require (
 	github.com/shurcooL/vfsgen v0.0.0-20180711163814-62bca832be04 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/stathat/consistent v1.0.0 // indirect
+	github.com/substrait-io/substrait-go v0.0.0-20220510140743-0f52d57022bf // indirect
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802 // indirect
