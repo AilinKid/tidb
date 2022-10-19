@@ -484,7 +484,7 @@ func (a *ExecStmt) Exec(ctx context.Context) (_ sqlexec.RecordSet, err error) {
 	}
 	if pp, ok := a.Plan.(plannercore.PhysicalPlan); ok {
 		rel, err := pp.ToSubstraitPB(sctx)
-		if err == nil && sctx.GetSessionVars().ConnectionID != 0 {
+		if rel != nil && err == nil && sctx.GetSessionVars().ConnectionID != 0 {
 			plan := &substraitgo.Plan{
 				Relations: []*substraitgo.PlanRel{
 					{
@@ -494,7 +494,7 @@ func (a *ExecStmt) Exec(ctx context.Context) (_ sqlexec.RecordSet, err error) {
 					},
 				},
 			}
-			// 把这个 rel 传给 velox
+			// 把这个 plan 传给 velox
 			logutil.BgLogger().Error(plan.String())
 		}
 	}
