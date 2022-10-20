@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	substraitgo "github.com/AilinKid/substrait-go/proto"
+	"github.com/substrait-io/substrait-go/proto/extensions"
 	"runtime/trace"
 	"strconv"
 	"strings"
@@ -483,9 +484,16 @@ func (a *ExecStmt) Exec(ctx context.Context) (_ sqlexec.RecordSet, err error) {
 		sctx.GetSessionVars().StmtCtx.MemTracker.SetBytesLimit(sctx.GetSessionVars().StmtCtx.MemQuotaQuery)
 	}
 	if pp, ok := a.Plan.(plannercore.PhysicalPlan); ok {
-		rel, err := pp.ToSubstraitPB(sctx)
+		ssHandler := plannercore.NewSubstraitHandler()
+		rel, err := pp.ToSubstraitPB(sctx, ssHandler)
 		if rel != nil && err == nil && sctx.GetSessionVars().ConnectionID != 0 {
 			plan := &substraitgo.Plan{
+				ExtensionUris: []*extensions.SimpleExtensionURI{
+					{
+						ExtensionUriAnchor: uint32(1),
+						Uri:                "whatever",
+					},
+				},
 				Relations: []*substraitgo.PlanRel{
 					{
 						RelType: &substraitgo.PlanRel_Root{
@@ -494,6 +502,18 @@ func (a *ExecStmt) Exec(ctx context.Context) (_ sqlexec.RecordSet, err error) {
 					},
 				},
 			}
+			for funcName, funcAnchor := range ssHandler.SigMap {
+				plan.Extensions = append(plan.Extensions, &extensions.SimpleExtensionDeclaration{
+					MappingType: &extensions.SimpleExtensionDeclaration_ExtensionFunction_{
+						ExtensionFunction: &extensions.SimpleExtensionDeclaration_ExtensionFunction{
+							ExtensionUriReference: 1,
+							FunctionAnchor:        funcAnchor,
+							Name:                  funcName,
+						},
+					},
+				})
+			}
+
 			// 把这个 plan 传给 velox
 			logutil.BgLogger().Error(plan.String())
 		}
