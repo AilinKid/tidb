@@ -778,6 +778,9 @@ type SessionVars struct {
 	// Enable3StageDistinctAgg indicates whether to allow 3 stage distinct aggregate
 	Enable3StageDistinctAgg bool
 
+	// EnableEliminatePartialAgg43StageDistinctAgg will eliminate the local hash agg for 3 stage distinct aggregate.
+	EnableEliminateLocalAgg43StageDistinctAgg bool
+
 	// MultiStatementMode permits incorrect client library usage. Not recommended to be turned on.
 	MultiStatementMode int
 
@@ -1754,6 +1757,8 @@ func NewSessionVars(hctx HookContext) *SessionVars {
 		ChunkPool:                     ReuseChunkPool{Alloc: nil},
 		mppExchangeCompressionMode:    DefaultExchangeCompressionMode,
 		mppVersion:                    kv.MppVersionUnspecified,
+
+		EnableEliminateLocalAgg43StageDistinctAgg: DefEliminateLocalAgg43StageDistinctAgg,
 	}
 	vars.KVVars = tikvstore.NewVariables(&vars.Killed)
 	vars.Concurrency = Concurrency{
