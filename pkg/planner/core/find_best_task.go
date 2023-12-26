@@ -847,6 +847,10 @@ func (ds *DataSource) matchPropForIndexMergeAlternatives(path *util.AccessPath, 
 	if path.IndexMergeIsIntersection {
 		return nil, false
 	}
+
+	if strings.HasPrefix(ds.SCtx().GetSessionVars().StmtCtx.OriginalSQL, "explain select /*+ use_index_merge(t1) */ * from t1 where c1 < 10 or c2 < 10 and c3") {
+		fmt.Println(1)
+	}
 	noSortItem := prop.IsSortItemEmpty()
 	allSame, _ := prop.AllSameOrder()
 	if !allSame {
@@ -922,7 +926,7 @@ func (ds *DataSource) matchPropForIndexMergeAlternatives(path *util.AccessPath, 
 		IndexMergeIsIntersection: false,
 	}
 	// path.ShouldBeKeptCurrentFilter record that whether there are some part of the cnf item couldn't be pushed down to tikv already.
-	shouldKeepCurrentFilter := path.ShouldBeKeptCurrentFilter != nil
+	shouldKeepCurrentFilter := path.ShouldBeKeptCurrentFilter
 	for _, path := range determinedIndexPartialPaths {
 		// If any partial path contains table filters, we need to keep the whole DNF filter in the Selection.
 		if len(path.TableFilters) > 0 {
@@ -940,12 +944,12 @@ func (ds *DataSource) matchPropForIndexMergeAlternatives(path *util.AccessPath, 
 		}
 	}
 	// Keep this filter as a part of table filters for safety if it has any parameter.
-	if expression.MaybeOverOptimized4PlanCache(ds.SCtx(), []expression.Expression{path.ShouldBeKeptCurrentFilter}) {
+	if expression.MaybeOverOptimized4PlanCache(ds.SCtx(), []expression.Expression{path.ShouldBeKeptCurrentFilterExpression}) {
 		shouldKeepCurrentFilter = true
 	}
 	if shouldKeepCurrentFilter {
 		// add the cnf expression back as table filer.
-		indexMergePath.TableFilters = append(indexMergePath.TableFilters, path.ShouldBeKeptCurrentFilter)
+		indexMergePath.TableFilters = append(indexMergePath.TableFilters, path.ShouldBeKeptCurrentFilterExpression)
 	}
 
 	// step3: after the index merge path is determined, compute the countAfterAccess as usual.
