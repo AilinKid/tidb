@@ -119,29 +119,13 @@ func (ds *DataSource) generateIndexMergePath() error {
 		}
 		return nil
 	}
-	// since undetermined index merge path couldn't sure to be a valid physical plan，if all targeted path are all about
-	// undetermined index merge path, here we don't prune other paths.
-	pruneJudge := func(targets []*util.AccessPath) bool {
-		allUndeterminedIndexMergePath := true
-		for _, one := range targets {
-			if len(one.PartialAlternativeIndexPaths) != 0 {
-				allUndeterminedIndexMergePath = false
-				break
-			}
-		}
-		return allUndeterminedIndexMergePath
-	}
 
 	// If len(indexMergeHints) > 0 and some index-merge paths were added, then prune all other non-index-merge paths.
 	// if len(ds.possibleAccessPaths) > oldIndexMergeCount, it means composed index merge path is generated, prune others.
 	if len(ds.possibleAccessPaths) > oldIndexMergeCount {
-		if pruneJudge(ds.possibleAccessPaths[oldIndexMergeCount:]) {
-			ds.possibleAccessPaths = ds.possibleAccessPaths[oldIndexMergeCount:]
-		}
+		ds.possibleAccessPaths = ds.possibleAccessPaths[oldIndexMergeCount:]
 	} else {
-		if pruneJudge(ds.possibleAccessPaths[regularPathCount:]) {
-			ds.possibleAccessPaths = ds.possibleAccessPaths[regularPathCount:]
-		}
+		ds.possibleAccessPaths = ds.possibleAccessPaths[regularPathCount:]
 	}
 	return nil
 }
