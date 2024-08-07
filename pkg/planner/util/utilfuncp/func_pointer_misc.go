@@ -17,10 +17,12 @@ package utilfuncp
 import (
 	"github.com/pingcap/tidb/pkg/expression"
 	"github.com/pingcap/tidb/pkg/kv"
+	"github.com/pingcap/tidb/pkg/parser/model"
 	"github.com/pingcap/tidb/pkg/planner/core/base"
 	"github.com/pingcap/tidb/pkg/planner/property"
 	"github.com/pingcap/tidb/pkg/planner/util"
 	"github.com/pingcap/tidb/pkg/planner/util/optimizetrace"
+	"github.com/pingcap/tidb/pkg/util/intset"
 )
 
 // this file is used for passing function pointer at init(){} to avoid some import cycles.
@@ -141,3 +143,9 @@ var ExhaustLogicalWindowPhysicalPlans func(lp base.LogicalPlan, prop *property.P
 // ExhaustPhysicalPlans4LogicalLock will be called by LogicalLock in logicalOp pkg.
 var ExhaustPhysicalPlans4LogicalLock func(lp base.LogicalPlan, prop *property.PhysicalProperty) (
 	[]base.PhysicalPlan, bool, error)
+
+var CollectColumnStatsUsage func(lp base.LogicalPlan, histNeeded bool) (
+	[]model.TableItemID,
+	[]model.StatsLoadItem,
+	*intset.FastIntSet,
+)

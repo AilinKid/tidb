@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package core
+package rule
 
 import (
 	"context"
@@ -24,8 +24,8 @@ import (
 	"github.com/pingcap/tidb/pkg/parser/model"
 	"github.com/pingcap/tidb/pkg/planner/core/base"
 	"github.com/pingcap/tidb/pkg/planner/util/optimizetrace"
+	"github.com/pingcap/tidb/pkg/planner/util/utilfuncp"
 	"github.com/pingcap/tidb/pkg/sessionctx/variable"
-	"github.com/pingcap/tidb/pkg/statistics"
 	"github.com/pingcap/tidb/pkg/table"
 	"github.com/pingcap/tidb/pkg/util/logutil"
 	"go.uber.org/zap"
@@ -42,7 +42,7 @@ func (CollectPredicateColumnsPoint) Optimize(_ context.Context, plan base.Logica
 	}
 	syncWait := plan.SCtx().GetSessionVars().StatsLoadSyncWait.Load()
 	histNeeded := syncWait > 0
-	predicateColumns, histNeededColumns, visitedPhysTblIDs := CollectColumnStatsUsage(plan, histNeeded)
+	predicateColumns, histNeededColumns, visitedPhysTblIDs := utilfuncp.CollectColumnStatsUsage(plan, histNeeded)
 	if len(predicateColumns) > 0 {
 		plan.SCtx().UpdateColStatsUsage(predicateColumns)
 	}
@@ -280,37 +280,4 @@ func collectHistNeededItems(histNeededColumns []model.StatsLoadItem, histNeededI
 	}
 	histNeededItems = append(histNeededItems, histNeededColumns...)
 	return
-}
-
-func recordTableRuntimeStats(sctx base.PlanContext, tbls map[int64]struct{}) {
-	tblStats := sctx.GetSessionVars().StmtCtx.TableStats
-	if tblStats == nil {
-		tblStats = map[int64]any{}
-	}
-	for tblID := range tbls {
-		tblJSONStats, skip, err := recordSingleTableRuntimeStats(sctx, tblID)
-		if err != nil {
-			logutil.BgLogger().Warn("record table json stats failed", zap.Int64("tblID", tblID), zap.Error(err))
-		}
-		if tblJSONStats == nil && !skip {
-			logutil.BgLogger().Warn("record table json stats failed due to empty", zap.Int64("tblID", tblID))
-		}
-		tblStats[tblID] = tblJSONStats
-	}
-	sctx.GetSessionVars().StmtCtx.TableStats = tblStats
-}
-
-func recordSingleTableRuntimeStats(sctx base.PlanContext, tblID int64) (stats *statistics.Table, skip bool, err error) {
-	dom := domain.GetDomain(sctx)
-	statsHandle := dom.StatsHandle()
-	is := sctx.GetDomainInfoSchema().(infoschema.InfoSchema)
-	tbl, ok := is.TableByID(tblID)
-	if !ok {
-		return nil, false, nil
-	}
-	tableInfo := tbl.Meta()
-	stats = statsHandle.GetTableStats(tableInfo)
-	// Skip the warning if the table is a temporary table because the temporary table doesn't have stats.
-	skip = tableInfo.TempTableType != model.TempTableNone
-	return stats, skip, nil
 }

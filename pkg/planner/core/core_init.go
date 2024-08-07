@@ -51,6 +51,7 @@ func init() {
 
 	utilfuncp.AppendCandidate4PhysicalOptimizeOp = appendCandidate4PhysicalOptimizeOp
 	utilfuncp.PushDownTopNForBaseLogicalPlan = pushDownTopNForBaseLogicalPlan
+	utilfuncp.CollectColumnStatsUsage = collectColumnStatsUsage
 
 	// For mv index init.
 	cardinality.GetTblInfoForUsedStatsByPhysicalID = getTblInfoForUsedStatsByPhysicalID
