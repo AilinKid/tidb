@@ -34,8 +34,24 @@ type GroupExpression struct {
 	// LogicalExpr is internal logical expression stands for this groupExpr.
 	LogicalPlan base.LogicalPlan
 
+	// mark is the rule mark of the GroupExpression.
+	RuleMark
+
 	// hash64 is the unique fingerprint of the GroupExpression.
 	hash64 uint64
+}
+
+// RuleMark is uses to mark whether GroupExpr has been fully explored by a transformation rules.
+type RuleMark int64
+
+// SetExplored sets the ordinal bit.
+func (m *RuleMark) SetExplored(ordinal int) {
+	*m |= 1 << ordinal
+}
+
+// IsExplored indicates whether the ordinal bit is set.
+func (m *RuleMark) IsExplored(ordinal int) bool {
+	return *m&(1<<ordinal) > 0
 }
 
 // Sum64 returns the cached hash64 of the GroupExpression.
