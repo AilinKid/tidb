@@ -22,10 +22,10 @@ import (
 // Task is an interface defined for all type of optimizing work: exploring, implementing,
 // deriving-stats, join-reordering and so on.
 type Task interface {
-	// task self executing logic
-	execute() error
-	// task self description string.
-	desc() string
+	// Execute task self executing logic
+	Execute() error
+	// Desc task self description string.
+	Desc() string
 }
 
 // Stack is abstract definition of task container.(TaskStack is a kind of array stack implementation of it)

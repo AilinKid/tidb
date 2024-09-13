@@ -29,8 +29,8 @@ type GroupExpression struct {
 	// group is the Group that this GroupExpression belongs to.
 	group *Group
 
-	// inputs stores the Groups that this GroupExpression based on.
-	inputs []*Group
+	// Inputs stores the Groups that this GroupExpression based on.
+	Inputs []*Group
 
 	// logicalPlan is internal logical expression stands for this groupExpr.
 	logicalPlan base.LogicalPlan
@@ -50,9 +50,14 @@ func (e *GroupExpression) Hash64(h base2.Hasher) {
 	// logical plan hash.
 	e.logicalPlan.Hash64(h)
 	// children group hash.
-	for _, child := range e.inputs {
+	for _, child := range e.Inputs {
 		child.Hash64(h)
 	}
+}
+
+// GetGroup returns the Group that this GroupExpression belongs to.
+func (e *GroupExpression) GetGroup() *Group {
+	return e.group
 }
 
 // Equals implements the Equals interface.
@@ -69,7 +74,7 @@ func (e *GroupExpression) Equals(other any) bool {
 	default:
 		return false
 	}
-	if len(e.inputs) != len(e2.inputs) {
+	if len(e.Inputs) != len(e2.Inputs) {
 		return false
 	}
 	if pattern.GetOperand(e.logicalPlan) != pattern.GetOperand(e2.logicalPlan) {
@@ -81,8 +86,8 @@ func (e *GroupExpression) Equals(other any) bool {
 		return false
 	}
 	// if one of the children is different, then the two GroupExpressions are different.
-	for i, one := range e.inputs {
-		if !one.Equals(e2.inputs[i]) {
+	for i, one := range e.Inputs {
+		if !one.Equals(e2.Inputs[i]) {
 			return false
 		}
 	}
@@ -93,7 +98,7 @@ func (e *GroupExpression) Equals(other any) bool {
 func NewGroupExpression(lp base.LogicalPlan, inputs []*Group) *GroupExpression {
 	return &GroupExpression{
 		group:       nil,
-		inputs:      inputs,
+		Inputs:      inputs,
 		logicalPlan: lp,
 		hash64:      0,
 	}

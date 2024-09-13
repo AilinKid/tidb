@@ -30,12 +30,12 @@ type Group struct {
 	// groupID indicates the uniqueness of this group, also for encoding.
 	groupID GroupID
 
-	// logicalExpressions indicates the logical equiv classes for this group.
-	logicalExpressions *list.List
+	// LogicalExpressions indicates the logical equiv classes for this group.
+	LogicalExpressions *list.List
 
-	// operand2FirstExpr is used to locate to the first same type logical expression
+	// Operand2FirstExpr is used to locate to the first same type logical expression
 	// in list above instead of traverse them all.
-	operand2FirstExpr map[pattern.Operand]*list.Element
+	Operand2FirstExpr map[pattern.Operand]*list.Element
 
 	// hash2GroupExpr is used to de-duplication in the list.
 	hash2GroupExpr map[uint64]*list.Element
@@ -78,37 +78,47 @@ func (g *Group) Exists(hash64u uint64) bool {
 }
 
 // Insert adds a GroupExpression to the Group.
-func (g *Group) Insert(e *GroupExpression) bool {
+func (g *Group) Insert(e *GroupExpression) (*list.Element, bool) {
 	if e == nil {
-		return false
+		return nil, false
 	}
 	// GroupExpressions hash should be initialized within Init(xxx) method.
 	hash64 := e.Sum64()
 	if g.Exists(hash64) {
-		return false
+		return nil, false
 	}
 	operand := pattern.GetOperand(e.logicalPlan)
 	var newEquiv *list.Element
-	mark, ok := g.operand2FirstExpr[operand]
+	mark, ok := g.Operand2FirstExpr[operand]
 	if ok {
 		// cluster same operands together.
-		newEquiv = g.logicalExpressions.InsertAfter(e, mark)
+		newEquiv = g.LogicalExpressions.InsertAfter(e, mark)
 	} else {
 		// otherwise, put it at the end.
-		newEquiv = g.logicalExpressions.PushBack(e)
-		g.operand2FirstExpr[operand] = newEquiv
+		newEquiv = g.LogicalExpressions.PushBack(e)
+		g.Operand2FirstExpr[operand] = newEquiv
 	}
 	g.hash2GroupExpr[hash64] = newEquiv
 	e.group = g
-	return true
+	return newEquiv, true
+}
+
+// Explored marks the Group as explored.
+func (g *Group) Explored() bool {
+	return g.explored
+}
+
+// SetExplored sets the Group as explored.
+func (g *Group) SetExplored(b bool) {
+	g.explored = b
 }
 
 // NewGroup creates a new Group with given logical prop.
 func NewGroup(prop *property.LogicalProperty) *Group {
 	g := &Group{
-		logicalExpressions: list.New(),
+		LogicalExpressions: list.New(),
 		hash2GroupExpr:     make(map[uint64]*list.Element),
-		operand2FirstExpr:  make(map[pattern.Operand]*list.Element),
+		Operand2FirstExpr:  make(map[pattern.Operand]*list.Element),
 		logicalProp:        prop,
 	}
 	return g
