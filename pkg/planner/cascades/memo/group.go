@@ -268,9 +268,7 @@ func (g *Group) mergeTo(target *Group) {
 // Clear clean and release the group element in the container.
 func (g *Group) Clear() {
 	// clean the list.
-	g.hash2GroupExpr.Each(func(key *GroupExpression, val *list.Element) {
-		g.logicalExpressions.Remove(val)
-	})
+	g.logicalExpressions.Init()
 	// clean the map.
 	g.hash2GroupExpr.Clear()
 	g.hash2ParentGroupExpr.Clear()

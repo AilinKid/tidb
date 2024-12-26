@@ -18,6 +18,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"github.com/pingcap/tidb/pkg/planner/cascades"
 	"math"
 	"slices"
 	"strconv"
@@ -283,7 +284,15 @@ func OptimizeV2(ctx context.Context, sctx base.PlanContext, flag uint64, logic b
 	if planCounter == 0 {
 		planCounter = -1
 	}
-	// todo: add cascadesOptimize(logic)
+
+	var cas *cascades.Cascades
+	if cas, err = cascades.NewCascades(sctx, logic); err == nil {
+		defer cas.Destroy()
+		err = cas.Execute()
+	}
+	if err != nil {
+		return nil, nil, 0, err
+	}
 
 	physical, cost, err := physicalOptimize(logic, &planCounter)
 	if err != nil {
