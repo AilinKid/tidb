@@ -33,6 +33,10 @@ import (
 
 var _ base.LogicalPlan = &BaseLogicalPlan{}
 
+const (
+	ApplyGenFromXFDeCorrelateRuleFlag uint64 = 1 << 0
+)
+
 // BaseLogicalPlan is the common structure that used in logical plan.
 type BaseLogicalPlan struct {
 	baseimpl.Plan
@@ -50,6 +54,9 @@ type BaseLogicalPlan struct {
 	// removing Max1Row operators, and mapping semi-joins to inner-joins.
 	// for now, it's hard to maintain in individual operator, build it from bottom up when using.
 	fdSet *fd.FDSet
+
+	// Flag is with that each bit has its meaning to mark this logical plan for special handling.
+	Flag uint64
 }
 
 // *************************** implementation of HashEquals interface ***************************
@@ -415,6 +422,16 @@ func (p *BaseLogicalPlan) SetMaxOneRow(b bool) {
 // GetWrappedLogicalPlan implements the logical plan interface.
 func (p *BaseLogicalPlan) GetWrappedLogicalPlan() base.LogicalPlan {
 	return p.self
+}
+
+// HasFlag check the base logical plan whether it has a flag.
+func (p *BaseLogicalPlan) HasFlag(mask uint64) bool {
+	return p.Flag&mask > 0
+}
+
+// SetFlag set the base logical plan with a flag.
+func (p *BaseLogicalPlan) SetFlag(mask uint64) {
+	p.Flag = p.Flag | mask
 }
 
 // NewBaseLogicalPlan is the basic constructor of BaseLogicalPlan.

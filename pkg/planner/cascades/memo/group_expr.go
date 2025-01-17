@@ -54,6 +54,9 @@ type GroupExpression struct {
 	// of them has been substituted halfway, the successive task waiting on the task
 	// should feel this gE is out of date, and this task is abandoned.
 	abandoned bool
+
+	// intermediate indicates this GE is intermediary one, which can be removed when
+	intermediate bool
 }
 
 // GetGroup returns the Group that this GroupExpression belongs to.

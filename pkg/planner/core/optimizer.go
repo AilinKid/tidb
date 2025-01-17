@@ -86,7 +86,6 @@ var optRuleList = []base.LogicalOptRule{
 	&ColumnPruner{},
 	&ResultReorder{},
 	&rule.BuildKeySolver{},
-	&DecorrelateSolver{},
 	&SemiJoinRewriter{},
 	&AggregationEliminator{},
 	&SkewDistinctAggRewriter{},
@@ -278,7 +277,7 @@ func CascadesOptimize(ctx context.Context, sctx base.PlanContext, flag uint64, l
 	}
 
 	var cas *cascades.Optimizer
-	if strings.Contains(logic.SCtx().GetSessionVars().StmtCtx.OriginalSQL, "(EXISTS(SELECT  1 FROM t2 WHERE a2 = a1 )") {
+	if strings.Contains(logic.SCtx().GetSessionVars().StmtCtx.OriginalSQL, "SELECT 1 FROM t1 AS tab") {
 		fmt.Println(1)
 	}
 

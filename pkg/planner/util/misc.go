@@ -126,6 +126,18 @@ func CloneCIStrs(strs []ast.CIStr) []ast.CIStr {
 	return cloned
 }
 
+// CloneScalarFuncs used Expression.Clone to clone a slice of scalar funcs.
+func CloneScalarFuncs(funcs []*expression.ScalarFunction) []*expression.ScalarFunction {
+	if funcs == nil {
+		return nil
+	}
+	cloned := make([]*expression.ScalarFunction, 0, len(funcs))
+	for _, e := range funcs {
+		cloned = append(cloned, e.Clone().(*expression.ScalarFunction))
+	}
+	return cloned
+}
+
 // CloneExprs uses Expression.Clone to clone a slice of Expression.
 func CloneExprs(exprs []expression.Expression) []expression.Expression {
 	if exprs == nil {
