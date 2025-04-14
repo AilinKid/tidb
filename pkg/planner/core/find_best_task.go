@@ -1499,7 +1499,7 @@ func findBestTask4LogicalDataSource(lp base.LogicalPlan, prop *property.Physical
 				// We can only build batch point get for hash partitions on a simple column now. This is
 				// decided by the current implementation of `BatchPointGetExec::initialize()`, specifically,
 				// the `getPhysID()` function. Once we optimize that part, we can come back and enable
-				// BatchPointGet plan for more cases.
+				// BatchPointGet plan for more cases
 				hashPartColName := getHashOrKeyPartitionColumnName(ds.SCtx(), ds.Table.Meta())
 				if hashPartColName == nil {
 					canConvertPointGet = false
