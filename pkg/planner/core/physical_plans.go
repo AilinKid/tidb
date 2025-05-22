@@ -507,6 +507,13 @@ type PhysicalIndexLookUpReader struct {
 	// required by cost calculation
 	expectedCnt uint64
 	keepOrder   bool
+
+	// IndexStoreType indicates table read from which type of store.
+	IndexStoreType kv.StoreType
+
+	// ReadReqType is the read request type for current physical table reader, there are 3 kinds of read request: Cop,
+	// BatchCop and MPP, currently, the latter two are only used in TiFlash
+	ReadReqType ReadReqType
 }
 
 // Clone implements op.PhysicalPlan interface.
@@ -519,6 +526,8 @@ func (p *PhysicalIndexLookUpReader) Clone(newCtx base.PlanContext) (base.Physica
 	}
 	cloned.physicalSchemaProducer = *base
 	cloned.IndexLookUpPushDown = p.IndexLookUpPushDown
+	cloned.IndexStoreType = p.IndexStoreType
+	cloned.ReadReqType = p.ReadReqType
 	cloned.IndexPlansUnNatureOrders = maps.Clone(p.IndexPlansUnNatureOrders)
 	if cloned.IndexPlans, err = clonePhysicalPlan(newCtx, p.IndexPlans); err != nil {
 		return nil, err
@@ -813,6 +822,7 @@ type PhysicalIndexScan struct {
 	isPartition bool
 	Desc        bool
 	KeepOrder   bool
+	FullText    bool
 	// ByItems only for partition table with orderBy + pushedLimit
 	ByItems []*util.ByItems
 
@@ -843,6 +853,8 @@ type PhysicalIndexScan struct {
 	GroupByColIdxs []int             `plan-cache-clone:"shallow"`
 
 	NotAlwaysValid bool
+
+	StoreType kv.StoreType
 }
 
 // Clone implements op.PhysicalPlan interface.

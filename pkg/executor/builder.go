@@ -4211,12 +4211,12 @@ func buildIndexLookUpPushDownDAGReq(ctx sessionctx.Context, columns []*model.Ind
 
 // buildIndexReq is designed to create a DAG for index request.
 func buildIndexReq(ctx sessionctx.Context, columns []*model.IndexColumn, handleLen int, plans []base.PhysicalPlan) (dagReq *tipb.DAGRequest, err error) {
-	indexReq, err := builder.ConstructDAGReq(ctx, plans, kv.TiKV)
+	idxScan := plans[0].(*plannercore.PhysicalIndexScan)
+	indexReq, err := builder.ConstructDAGReq(ctx, plans, idxScan.StoreType)
 	if err != nil {
 		return nil, err
 	}
 
-	idxScan := plans[0].(*plannercore.PhysicalIndexScan)
 	outputOffsets, err := buildIndexScanOutputOffsets(idxScan, columns, handleLen)
 	if err != nil {
 		return nil, err
@@ -4336,6 +4336,8 @@ func buildNoRangeIndexLookUpReader(b *executorBuilder, v *plannercore.PhysicalIn
 		avgRowSize:                 v.GetAvgTableRowSize(),
 		indexLookUpPushDown:        v.IndexLookUpPushDown,
 		groupedRanges:              is.GroupedRanges,
+		storeType:                  v.IndexStoreType,
+		batchCop:                   v.ReadReqType == plannercore.BatchCop,
 	}
 
 	if v.ExtraHandleCol != nil {

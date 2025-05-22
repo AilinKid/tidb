@@ -108,6 +108,7 @@ type AccessPath struct {
 
 	// Maybe added in model.IndexInfo better, but the cache of model.IndexInfo may lead side effect
 	IsUkShardIndexPath bool
+
 	// IndexLookUpPushDownBy indicates whether to use index lookup push down optimization and where it is from.
 	IndexLookUpPushDownBy IndexLookUpPushDownByType
 
@@ -135,6 +136,10 @@ type AccessPath struct {
 	//     so PartIdxCondNotAlwaysValid is true (the index path is not always valid).
 	// We add this field to make the plan cache usable for partial indexes in these limited cases.
 	PartIdxCondNotAlwaysValid bool
+
+	FullText     bool
+	QueryColumns []*expression.Column
+	QueryJSONStr string
 }
 
 // Clone returns a deep copy of the original AccessPath.
@@ -174,6 +179,9 @@ func (path *AccessPath) Clone() *AccessPath {
 		GroupedRanges:                make([][]*ranger.Range, 0, len(path.GroupedRanges)),
 		GroupByColIdxs:               slices.Clone(path.GroupByColIdxs),
 		PartIdxCondNotAlwaysValid:    path.PartIdxCondNotAlwaysValid,
+		FullText:                     path.FullText,
+		QueryColumns:                 CloneCols(path.QueryColumns),
+		QueryJSONStr:                 path.QueryJSONStr,
 	}
 	if path.IndexMergeORSourceFilter != nil {
 		ret.IndexMergeORSourceFilter = path.IndexMergeORSourceFilter.Clone()
@@ -196,7 +204,7 @@ func (path *AccessPath) Clone() *AccessPath {
 
 // IsTablePath returns true if it's IntHandlePath or CommonHandlePath. Including tiflash table scan.
 func (path *AccessPath) IsTablePath() bool {
-	return path.IsIntHandlePath || path.IsCommonHandlePath || (path.Index != nil && path.StoreType == kv.TiFlash)
+	return path.IsIntHandlePath || path.IsCommonHandlePath || (path.Index != nil && !path.Index.IsFulltextIndex() && path.StoreType == kv.TiFlash)
 }
 
 // IsTiKVTablePath returns true if it's IntHandlePath or CommonHandlePath. And the store type is TiKV.

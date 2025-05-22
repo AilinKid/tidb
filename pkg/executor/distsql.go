@@ -346,7 +346,7 @@ func (e *IndexReaderExecutor) buildKVRangesForIndexReader() ([]kv.KeyRange, erro
 
 	results := make([]kv.KeyRange, 0, len(groupedRanges))
 	for _, ranges := range groupedRanges {
-		kvRanges, err := buildKeyRanges(e.dctx, ranges, e.partRangeMap, tableIDs, e.index.ID, nil)
+		kvRanges, err := buildKeyRanges(e.dctx, ranges, e.partRangeMap, tableIDs, e.index.ID, e.index.IsFulltextIndex(), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -550,6 +550,10 @@ type IndexLookUpExecutor struct {
 
 	// Whether to push down the index lookup to TiKV
 	indexLookUpPushDown bool
+
+	storeType kv.StoreType
+	// batchCop indicates whether use super batch coprocessor request, only works for TiFlash engine.
+	batchCop bool
 }
 
 type kvRangesWithPhysicalTblID struct {
@@ -627,6 +631,7 @@ func buildKeyRanges(dctx *distsqlctx.DistSQLContext,
 	rangeOverrideForPartitionID map[int64][]*ranger.Range,
 	physicalIDs []int64,
 	indexID int64,
+	isFulltext bool,
 	memTracker *memory.Tracker,
 ) ([][]kv.KeyRange, error) {
 	results := make([][]kv.KeyRange, 0, len(physicalIDs))
@@ -635,7 +640,13 @@ func buildKeyRanges(dctx *distsqlctx.DistSQLContext,
 		if pRange, ok := rangeOverrideForPartitionID[physicalID]; ok {
 			curRanges = pRange
 		}
-		if indexID == -1 {
+		if isFulltext {
+			rRanges, err := distsql.FulltextIndexRangesToKVRanges(dctx, []int64{physicalID}, curRanges)
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, rRanges.FirstPartitionRange())
+		} else if indexID == -1 {
 			rRanges, err := distsql.CommonHandleRangesToKVRanges(dctx, []int64{physicalID}, curRanges)
 			if err != nil {
 				return nil, err
@@ -670,7 +681,7 @@ func (e *IndexLookUpExecutor) buildTableKeyRanges() (err error) {
 	kvRanges := make([][]kv.KeyRange, 0, len(groupedRanges))
 	physicalTblIDsForPartitionKVRanges := make([]int64, 0, len(tableIDs)*len(groupedRanges))
 	for _, ranges := range groupedRanges {
-		kvRange, err := buildKeyRanges(e.dctx, ranges, e.partitionRangeMap, tableIDs, e.index.ID, e.memTracker)
+		kvRange, err := buildKeyRanges(e.dctx, ranges, e.partitionRangeMap, tableIDs, e.index.ID, e.index.IsFulltextIndex(), e.memTracker)
 		if err != nil {
 			return err
 		}
@@ -695,6 +706,9 @@ func (e *IndexLookUpExecutor) buildTableKeyRanges() (err error) {
 }
 
 func (e *IndexLookUpExecutor) open(_ context.Context) error {
+	if e.storeType == kv.TiFlash {
+		e.batchCop = true
+	}
 	// We have to initialize "memTracker" and other execution resources in here
 	// instead of in function "Open", because this "IndexLookUpExecutor" may be
 	// constructed by a "IndexLookUpJoin" and "Open" will not be called in that
@@ -712,7 +726,19 @@ func (e *IndexLookUpExecutor) open(_ context.Context) error {
 
 	var err error
 	if e.corColInIdxSide {
-		if e.indexLookUpPushDown {
+		if e.storeType == kv.TiFlash {
+			var executors []*tipb.Executor
+			executors, err = builder.ConstructTreeBasedDistExec(e.buildPBCtx, e.idxPlans[len(e.idxPlans)-1])
+			if err == nil {
+				if len(executors) == 0 {
+					err = errors.New("empty TiFlash index executor tree")
+				} else {
+					e.dagPB.RootExecutor = executors[0]
+				}
+			}
+		} else if e.storeType != kv.TiKV {
+			err = errors.Errorf("unsupported store type %s", e.storeType.Name())
+		} else if e.indexLookUpPushDown {
 			e.dagPB.Executors, err = builder.ConstructListBasedDistExecForUnNatureOrderPlans(e.buildPBCtx, e.idxPlans, e.idxPlanUnNatureOrders)
 		} else {
 			e.dagPB.Executors, err = builder.ConstructListBasedDistExec(e.buildPBCtx, e.idxPlans)
@@ -1086,7 +1112,13 @@ func (e *IndexLookUpExecutor) buildIndexSelectResultForRange(
 		SetClosestReplicaReadAdjuster(newClosestReadAdjuster(e.dctx, &builder.Request, e.idxNetDataSize/float64(totalRanges))).
 		SetMemTracker(tracker).
 		SetConnIDAndConnAlias(e.dctx.ConnectionID, e.dctx.SessionAlias).
+		SetAllowBatchCop(e.batchCop).
+		SetStoreType(e.storeType).
 		SetCoprRequestRateLimit(sharedCoprRequestRateLimit)
+	if e.index.IsFulltextIndex() {
+		builder.SetPaging(false)
+		builder.SetFullText(true)
+	}
 
 	if e.indexLookUpPushDown {
 		// Paging and Cop-cache is not supported in index lookup push down.
