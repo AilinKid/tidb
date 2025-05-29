@@ -42,6 +42,12 @@ func newIndexForTest(id int64, cols ...*ColumnInfo) *IndexInfo {
 	}
 }
 
+func TestIndexInfoIsNonKVIndex(t *testing.T) {
+	require.False(t, (&IndexInfo{}).IsNonKVIndex())
+	require.True(t, (&IndexInfo{VectorInfo: &VectorIndexInfo{}}).IsNonKVIndex())
+	require.True(t, (&IndexInfo{FullTextInfo: &FullTextIndexInfo{}}).IsNonKVIndex())
+}
+
 func TestIsIndexPrefixCovered(t *testing.T) {
 	c0 := newColumnForTest(0, 0)
 	c1 := newColumnForTest(1, 1)

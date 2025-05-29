@@ -26,9 +26,40 @@ import (
 	"github.com/pingcap/tidb/pkg/disttask/framework/proto"
 	"github.com/pingcap/tidb/pkg/disttask/framework/storage"
 	"github.com/pingcap/tidb/pkg/meta/model"
+	"github.com/pingcap/tidb/pkg/parser/ast"
+	pmodel "github.com/pingcap/tidb/pkg/parser/model"
+	"github.com/pingcap/tidb/pkg/parser/mysql"
+	"github.com/pingcap/tidb/pkg/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
+
+func TestBuildFullTextIndexInfo(t *testing.T) {
+	tblInfo := &model.TableInfo{
+		Name: pmodel.NewCIStr("t"),
+		Columns: []*model.ColumnInfo{
+			{Name: pmodel.NewCIStr("title"), Offset: 0, FieldType: *types.NewFieldType(mysql.TypeVarchar)},
+			{Name: pmodel.NewCIStr("body"), Offset: 1, FieldType: *types.NewFieldType(mysql.TypeBlob)},
+			{Name: pmodel.NewCIStr("id"), Offset: 2, FieldType: *types.NewFieldType(mysql.TypeLonglong)},
+		},
+	}
+	parts := []*ast.IndexPartSpecification{
+		{Column: &ast.ColumnName{Name: pmodel.NewCIStr("title")}, Length: types.UnspecifiedLength},
+		{Column: &ast.ColumnName{Name: pmodel.NewCIStr("body")}, Length: types.UnspecifiedLength},
+	}
+
+	idx, err := buildFullTextIndexInfo(tblInfo, pmodel.NewCIStr("fts"), parts, nil, model.StateNone)
+	require.NoError(t, err)
+	require.Equal(t, pmodel.NewCIStr("fts"), idx.Name)
+	require.Len(t, idx.Columns, 2)
+	require.Equal(t, model.FullTextParserTypeStandardV1, idx.FullTextInfo.ParserType)
+	require.True(t, idx.IsNonKVIndex())
+
+	_, err = buildFullTextIndexInfo(tblInfo, pmodel.NewCIStr("bad"), []*ast.IndexPartSpecification{
+		{Column: &ast.ColumnName{Name: pmodel.NewCIStr("id")}, Length: types.UnspecifiedLength},
+	}, nil, model.StateNone)
+	require.ErrorContains(t, err, "FULLTEXT index only supports string columns")
+}
 
 func TestModifyTaskParamLoop(t *testing.T) {
 	type env struct {

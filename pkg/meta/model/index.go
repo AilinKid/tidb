@@ -113,6 +113,10 @@ const (
 	FullTextParserTypeStandardV1 FullTextParserType = "STANDARD_V1"
 	// FullTextParserTypeMultilingualV1 is a parser for multilingual texts.
 	FullTextParserTypeMultilingualV1 FullTextParserType = "MULTILINGUAL_V1"
+	// FullTextParserTypeNgramV1 is a better recall rate,
+	// but may be not better performed parser.
+	// The value matches with the supported tokenizer in Libclara.
+	FullTextParserTypeNgramV1 FullTextParserType = "NGRAM_V1"
 )
 
 // SQLName returns the SQL keyword name of the fulltext parser.
@@ -122,6 +126,8 @@ func (t FullTextParserType) SQLName() string {
 		return "STANDARD"
 	case FullTextParserTypeMultilingualV1:
 		return "MULTILINGUAL"
+	case FullTextParserTypeNgramV1:
+		return "NGRAM"
 	default:
 		return "INVALID"
 	}
@@ -134,6 +140,8 @@ func GetFullTextParserTypeBySQLName(name string) FullTextParserType {
 		return FullTextParserTypeStandardV1
 	case "MULTILINGUAL":
 		return FullTextParserTypeMultilingualV1
+	case "NGRAM":
+		return FullTextParserTypeNgramV1
 	default:
 		return FullTextParserTypeInvalid
 	}
@@ -254,6 +262,11 @@ func (index *IndexInfo) IsPublic() bool {
 // For a TiFlash local index, no actual index data need to be written to KV layer.
 func (index *IndexInfo) IsTiFlashLocalIndex() bool {
 	return index.VectorInfo != nil
+}
+
+// IsNonKVIndex checks whether the index has no index data in TiKV.
+func (index *IndexInfo) IsNonKVIndex() bool {
+	return index.IsTiFlashLocalIndex() || index.FullTextInfo != nil
 }
 
 // IsFulltextIndex checks whether the index is a fulltext index.

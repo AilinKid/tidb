@@ -243,7 +243,7 @@ func (w *worker) onModifyColumn(jobCtx *jobContext, job *model.Job) (ver int64, 
 		columns := getReplacedColumns(tblInfo, oldCol, args.Column)
 		allIdxs := buildRelatedIndexInfos(tblInfo, oldCol.ID)
 		for _, idx := range allIdxs {
-			if err := checkIndexInModifiableColumns(columns, idx.Columns, idx.VectorInfo != nil); err != nil {
+			if err := checkIndexInModifiableColumns(columns, idx.Columns, idx.IsNonKVIndex()); err != nil {
 				job.State = model.JobStateCancelled
 				return ver, errors.Trace(err)
 			}
@@ -340,7 +340,7 @@ func (w *worker) onModifyColumn(jobCtx *jobContext, job *model.Job) (ver int64, 
 	}
 	if isColumnarIndexColumn(tblInfo, oldCol) {
 		job.State = model.JobStateCancelled
-		return ver, errors.Trace(dbterror.ErrUnsupportedModifyColumn.GenWithStackByArgs("vector indexes on the column"))
+		return ver, errors.Trace(dbterror.ErrUnsupportedModifyColumn.GenWithStackByArgs("non-KV indexes on the column"))
 	}
 	if mysql.HasPriKeyFlag(oldCol.GetFlag()) {
 		job.State = model.JobStateCancelled
@@ -1554,7 +1554,7 @@ func GetModifiableColumnJob(
 			return nil, dbterror.ErrUnsupportedModifyColumn.GenWithStackByArgs("table is partition table")
 		}
 		if isColumnarIndexColumn(t.Meta(), col.ColumnInfo) {
-			return nil, dbterror.ErrUnsupportedModifyColumn.GenWithStackByArgs("vector indexes on the column")
+			return nil, dbterror.ErrUnsupportedModifyColumn.GenWithStackByArgs("non-KV indexes on the column")
 		}
 		// new col's origin default value be the same as the new default value.
 		originDefVal, err := generateOriginDefaultValue(newCol.ColumnInfo, sctx, false)
@@ -1899,7 +1899,7 @@ func checkColumnWithIndexConstraint(tbInfo *model.TableInfo, originalCol, newCol
 		if !modified {
 			return
 		}
-		err = checkIndexInModifiableColumns(columns, indexInfo.Columns, indexInfo.VectorInfo != nil)
+		err = checkIndexInModifiableColumns(columns, indexInfo.Columns, indexInfo.IsNonKVIndex())
 		if err != nil {
 			return
 		}
