@@ -715,6 +715,8 @@ github.com/pingcap/log v1.1.1-0.20250917021125-19901e015dc9 h1:qG9BSvlWFEE5otQGa
 github.com/pingcap/log v1.1.1-0.20250917021125-19901e015dc9/go.mod h1:ORfBOFp1eteu2odzsyaxI+b8TzJwgjwyQcGhI+9SfEA=
 github.com/pingcap/sysutil v1.0.1-0.20240311050922-ae81ee01f3a5 h1:T4pXRhBflzDeAhmOQHNPRRogMYxP13V7BkYw3ZsoSfE=
 github.com/pingcap/sysutil v1.0.1-0.20240311050922-ae81ee01f3a5/go.mod h1:rlimy0GcTvjiJqvD5mXTRr8O2eNZPBrcUgiWVYp9530=
+github.com/AilinKid/kvproto v0.0.0-20260902143537-d86730cc0658 h1:GyZDoQX3TWXcFlc8OVjhN0Mb4kg7vgtgrCvO8HR5y/A=
+github.com/AilinKid/kvproto v0.0.0-20260902143537-d86730cc0658/go.mod h1:rXxWk2UnwfUhLXha1jxRWPADw9eMZGWEWCg92Tgmb/8=
 github.com/AilinKid/tipb v0.0.0-20260902090421-bb7af0def01e h1:efdyKH5WaWybZIYB77oHR/Z3lJSDgdadXMaeLlqd2M0=
 github.com/AilinKid/tipb v0.0.0-20260902090421-bb7af0def01e/go.mod h1:A7mrd7WHBl1o63LE2bIBGEJMTNWXqhgmYiOvMLxozfs=
 github.com/pingcap/tipb v0.0.0-20260605083900-f9f651ef5fbc h1:wxolKysltFSu8gxWJBdUdWuTBoSuY3MjNIIZI5S9JLY=

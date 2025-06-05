@@ -1118,6 +1118,9 @@ func (e *IndexLookUpExecutor) buildIndexSelectResultForRange(
 	if e.index.IsFulltextIndex() {
 		builder.SetPaging(false)
 		builder.SetFullText(true)
+		builder.FullTextInfo.TableID = e.table.Meta().ID
+		builder.FullTextInfo.IndexID = e.index.ID
+		builder.FullTextInfo.ExecutorID = e.idxPlans[0].ExplainID().String()
 	}
 
 	if e.indexLookUpPushDown {
