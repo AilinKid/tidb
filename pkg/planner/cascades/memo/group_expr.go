@@ -248,9 +248,6 @@ func (e *GroupExpression) ExhaustPhysicalPlans(prop *property.PhysicalProperty) 
 	// the specific function pointer, and then iterate its children to get their logical property.
 	switch x := e.GetWrappedLogicalPlan().(type) {
 	case *logicalop.LogicalCTE:
-		// we pass GE rather than logical plan, it's a super set of LogicalPlan interface, which enable cascades
-		// framework to iterate its children, and then get their logical property. Meanwhile, we can also get basic
-		// wrapped logical plan from GE, so we can use same function pointer to handle logic inside.
 		return utilfuncp.ExhaustPhysicalPlans4LogicalCTE(x, prop)
 	case *logicalop.LogicalSort:
 		return utilfuncp.ExhaustPhysicalPlans4LogicalSort(x, prop)
@@ -259,6 +256,9 @@ func (e *GroupExpression) ExhaustPhysicalPlans(prop *property.PhysicalProperty) 
 	case *logicalop.LogicalLock:
 		return utilfuncp.ExhaustPhysicalPlans4LogicalLock(x, prop)
 	case *logicalop.LogicalJoin:
+		// we pass GE rather than logical plan, it's a super set of LogicalPlan interface, which enable cascades
+		// framework to iterate its children, and then get their logical property. Meanwhile, we can also get basic
+		// wrapped logical plan from GE, so we can use same function pointer to handle logic inside.
 		return utilfuncp.ExhaustPhysicalPlans4LogicalJoin(e, prop)
 	case *logicalop.LogicalApply:
 		return utilfuncp.ExhaustPhysicalPlans4LogicalApply(e, prop)
