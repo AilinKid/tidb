@@ -48,6 +48,7 @@ import (
 	"github.com/pingcap/tidb/pkg/resourcegroup"
 	"github.com/pingcap/tidb/pkg/session/cursor"
 	"github.com/pingcap/tidb/pkg/sessionctx/variable"
+	"github.com/pingcap/tidb/pkg/tici"
 	util2 "github.com/pingcap/tidb/pkg/util"
 	"github.com/pingcap/tidb/pkg/util/dbterror"
 	"github.com/pingcap/tidb/pkg/util/engine"
@@ -1304,11 +1305,12 @@ func GetTiFlashStoresStat(ctx context.Context) (*pdhttp.StoresInfo, error) {
 
 // CreateFulltextIndex create fulltext infex on TiCI.
 func CreateFulltextIndex(ctx context.Context, tblInfo *model.TableInfo, indexInfo *model.IndexInfo, schemaName string) error {
-	ticiManager, err := NewTiCIManager("0.0.0.0", "50061")
+	// TODO: Adopt service discovery with ETCD to get TiCI address.
+	ticiManager, err := tici.NewTiCIManager("0.0.0.0", "50061")
 	if err != nil {
 		return err
 	}
-	defer ticiManager.conn.Close()
+	defer ticiManager.Conn.Close()
 	return ticiManager.CreateFulltextIndex(ctx, tblInfo, indexInfo, schemaName)
 }
 
