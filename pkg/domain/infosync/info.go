@@ -1311,7 +1311,7 @@ func CreateFulltextIndex(ctx context.Context, tblInfo *model.TableInfo, indexInf
 		}
 		failpoint.Return(errors.New("mock create TiCI index failed"))
 	})
-	ticiManager, err := tici.NewTiCIManager(ctx, GetEtcdClient())
+	ticiManager, err := tici.NewManagerCtx(ctx, GetEtcdClient())
 	if err != nil {
 		return err
 	}
@@ -1321,7 +1321,7 @@ func CreateFulltextIndex(ctx context.Context, tblInfo *model.TableInfo, indexInf
 
 // DropFullTextIndex drop fulltext index on TiCI.
 func DropFullTextIndex(ctx context.Context, tableID int64, indexID int64) error {
-	ticiManager, err := tici.NewTiCIManager(ctx, GetEtcdClient())
+	ticiManager, err := tici.NewManagerCtx(ctx, GetEtcdClient())
 	if err != nil {
 		return err
 	}

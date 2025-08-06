@@ -187,7 +187,7 @@ func NewTableImporter(
 		return nil, err
 	}
 
-	if err := localBackend.InitTiCIWriterGroup(ctx, e.Table.Meta(), e.DBName); err != nil {
+	if err := localBackend.InitTiCIWriterGroup(ctx, getEtcdClient, e.Table.Meta(), e.DBName); err != nil {
 		return nil, err
 	}
 
