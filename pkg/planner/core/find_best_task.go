@@ -733,6 +733,10 @@ func compareCandidates(sctx base.PlanContext, statsTbl *statistics.Table, prop *
 	if isMVIndexPath(lhs.path) || isMVIndexPath(rhs.path) {
 		return 0, false
 	}
+	// TiCI index can not be compared currently.
+	if lhs.path.FtsQueryInfo != nil || rhs.path.FtsQueryInfo != nil {
+		return 0, false
+	}
 	// lhsPseudo == lhs has pseudo (no) stats for the table or index for the lhs path.
 	// rhsPseudo == rhs has pseudo (no) stats for the table or index for the rhs path.
 	//
@@ -1559,7 +1563,7 @@ func skylinePruning(ds *logicalop.DataSource, prop *property.PhysicalProperty) [
 					path.ForcePartialOrder = true
 				}
 			}
-			keepIndex := len(path.AccessConds) > 0 || !prop.IsSortItemEmpty() || path.Forced || path.IsSingleScan || matchPartialOrderIndex
+			keepIndex := len(path.AccessConds) > 0 || !prop.IsSortItemEmpty() || path.Forced || path.IsSingleScan || matchPartialOrderIndex || path.FtsQueryInfo != nil
 			if !keepIndex {
 				continue
 			}
@@ -2541,6 +2545,10 @@ func convertToIndexScan(ds *logicalop.DataSource, prop *property.PhysicalPropert
 		// TODO: make IndexReader support accessing MVIndex directly.
 		return base.InvalidTask, nil
 	}
+	// TiCI currently can not set the order property.
+	if candidate.path.FtsQueryInfo != nil && !prop.IsSortItemEmpty() {
+		return base.InvalidTask, nil
+	}
 	if !candidate.path.IsSingleScan {
 		// If it's parent requires single read task, return max cost.
 		if prop.TaskTp == property.CopSingleReadTaskType {
@@ -2674,6 +2682,8 @@ func convertToIndexScan(ds *logicalop.DataSource, prop *property.PhysicalPropert
 		task = task.ConvertToRootTask(ds.SCtx())
 	} else if _, ok := task.(*RootTask); ok {
 		return base.InvalidTask, nil
+	} else if is.FtsQueryInfo != nil {
+		cop.finishIndexPlan()
 	}
 	return task, nil
 }
@@ -3468,10 +3478,6 @@ func getOriginalPhysicalTableScan(ds *logicalop.DataSource, prop *property.Physi
 
 func getOriginalPhysicalIndexScan(ds *logicalop.DataSource, prop *property.PhysicalProperty, path *util.AccessPath, isMatchProp bool, isSingleScan bool) *PhysicalIndexScan {
 	idx := path.Index
-	if path.Index.IsFulltextIndex() {
-		prop.FullTextProp.QueryColumns = path.QueryColumns
-		prop.FullTextProp.QueryJSONStr = path.QueryJSONStr
-	}
 	is := PhysicalIndexScan{
 		Table:            ds.TableInfo,
 		TableAsName:      ds.TableAsName,
@@ -3480,7 +3486,7 @@ func getOriginalPhysicalIndexScan(ds *logicalop.DataSource, prop *property.Physi
 		Index:            idx,
 		IdxCols:          path.IdxCols,
 		IdxColLens:       path.IdxColLens,
-		FullText:         idx.IsFulltextIndex(),
+		FullText:         idx.IsFulltextIndexOnTiCI(),
 		AccessCondition:  path.AccessConds,
 		Ranges:           path.Ranges,
 		dataSourceSchema: ds.Schema(),
@@ -3492,7 +3498,11 @@ func getOriginalPhysicalIndexScan(ds *logicalop.DataSource, prop *property.Physi
 		prop:             prop,
 		NotAlwaysValid:   path.PartIdxCondNotAlwaysValid,
 		StoreType:        path.StoreType,
+		FtsQueryInfo:     path.FtsQueryInfo,
 	}.Init(ds.SCtx(), ds.QueryBlockOffset())
+	if is.FtsQueryInfo != nil {
+		is.StoreType = kv.TiFlash
+	}
 	rowCount := path.CountAfterAccess
 	is.initSchema(append(path.FullIdxCols, ds.CommonHandleCols...), !isSingleScan)
 

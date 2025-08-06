@@ -514,7 +514,7 @@ func buildFullTextIndexInfo(
 	seenColumns := make(map[string]struct{}, len(indexPartSpecifications))
 	for _, idxPart := range indexPartSpecifications {
 		if idxPart.Column == nil {
-			return nil, dbterror.ErrGeneralUnsupportedDDL.GenWithStackByArgs("FULLTEXT index only supports column references")
+			return nil, dbterror.ErrGeneralUnsupportedDDL.GenWithStackByArgs("FULLTEXT index must specific at least one column")
 		}
 		if idxPart.Length != types.UnspecifiedLength {
 			return nil, dbterror.ErrGeneralUnsupportedDDL.GenWithStackByArgs("FULLTEXT index does not support prefix length")
@@ -527,7 +527,7 @@ func buildFullTextIndexInfo(
 			return nil, infoschema.ErrColumnNotExists.GenWithStackByArgs(idxPart.Column.Name.L, tblInfo.Name)
 		}
 		if !types.IsString(colInfo.FieldType.GetType()) {
-			return nil, dbterror.ErrGeneralUnsupportedDDL.GenWithStackByArgs("FULLTEXT index only supports string columns")
+			return nil, dbterror.ErrGeneralUnsupportedDDL.GenWithStackByArgs(fmt.Sprintf("only support string type, but this is type: %s", colInfo.FieldType.String()))
 		}
 		if _, exists := seenColumns[colInfo.Name.L]; exists {
 			return nil, dbterror.ErrGeneralUnsupportedDDL.GenWithStackByArgs("FULLTEXT index contains a duplicate column")
@@ -554,7 +554,7 @@ func buildFullTextIndexInfo(
 		parserType = model.GetFullTextParserTypeBySQLName(indexOption.ParserName.L)
 	}
 	if parserType == model.FullTextParserTypeInvalid {
-		return nil, dbterror.ErrGeneralUnsupportedDDL.GenWithStackByArgs("fulltext index must specify a valid parser")
+		return nil, dbterror.ErrUnsupportedIndexType.FastGen("Unsupported parser '%s'", indexOption.ParserName.O)
 	}
 	if indexOption != nil && indexOption.Visibility == ast.IndexVisibilityInvisible {
 		return nil, dbterror.ErrGeneralUnsupportedDDL.GenWithStackByArgs("FULLTEXT index does not support INVISIBLE")
@@ -2155,7 +2155,7 @@ func onDropIndex(jobCtx *jobContext, job *model.Job) (ver int64, _ error) {
 			if indexInfo.IsTiFlashLocalIndex() {
 				isTiFlashIndex = true
 			}
-			if indexInfo.IsFulltextIndex() {
+			if indexInfo.IsFulltextIndexOnTiCI() {
 				isFullTextIndex = true
 			}
 			indexInfo.State = model.StateNone

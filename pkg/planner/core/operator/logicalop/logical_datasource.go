@@ -43,9 +43,12 @@ import (
 	"github.com/pingcap/tidb/pkg/statistics"
 	"github.com/pingcap/tidb/pkg/table"
 	"github.com/pingcap/tidb/pkg/types"
+	tidbutil "github.com/pingcap/tidb/pkg/util"
+	"github.com/pingcap/tidb/pkg/util/dbterror/plannererrors"
 	h "github.com/pingcap/tidb/pkg/util/hint"
 	"github.com/pingcap/tidb/pkg/util/intset"
 	"github.com/pingcap/tidb/pkg/util/plancodec"
+	"github.com/pingcap/tipb/go-tipb"
 )
 
 // DataSource represents a tableScan without condition push down.
@@ -239,6 +242,21 @@ func (ds *DataSource) PredicatePushDown(predicates []expression.Expression, opt 
 	ds.AllConds = predicates
 	ds.PushedDownConds, predicates = expression.PushDownExprs(util.GetPushDownCtx(ds.SCtx()), predicates, kv.UnSpecified)
 	appendDataSourcePredicatePushDownTraceStep(ds, opt)
+	if ds.SCtx().HasFTSFunc() {
+		// The v8.5 PredicatePushDown interface cannot return an error. Analyze the
+		// FTS predicate here, before path statistics can be cached, and let the
+		// validation rule report any error immediately after PPD.
+		_ = ds.AnalyzeFTSFunc()
+	} else {
+		ds.AllPossibleAccessPaths = slices.DeleteFunc(ds.AllPossibleAccessPaths, func(path *util.AccessPath) bool {
+			return path.Index != nil && path.Index.FullTextInfo != nil
+		})
+		ds.PossibleAccessPaths = slices.DeleteFunc(ds.PossibleAccessPaths, func(path *util.AccessPath) bool {
+			// If there are no FTS filters, remove FTS index paths because they are
+			// not suitable for a normal scan.
+			return path.Index != nil && path.Index.FullTextInfo != nil
+		})
+	}
 	return predicates, ds
 }
 
@@ -802,4 +820,121 @@ func (ds *DataSource) CheckPartialIndexByFilters(index *model.IndexInfo, filters
 		return false, false
 	}
 	return true, !partidx.AlwaysMeetConstraints(ds.SCtx(), cnfExprs, normalizedFilters)
+}
+
+// AnalyzeFTSFunc checks whether an FTS function is valid and converts it to an
+// index call because it cannot be executed without the index.
+//
+// The v8.5 planner PredicatePushDown interface cannot return an error. The FTS
+// validation rule invokes this method immediately after predicate pushdown.
+func (ds *DataSource) AnalyzeFTSFunc() error {
+	// Predicate pushdown performs the conversion before statistics derivation.
+	// The following validation rule calls this method again to surface errors;
+	// keep the successful conversion idempotent.
+	for _, path := range ds.PossibleAccessPaths {
+		if path.FtsQueryInfo != nil {
+			return nil
+		}
+	}
+	ticiIdx2FastCheck := make(map[*model.IndexInfo]intset.FastIntSet)
+	idSetForCheck := intset.NewFastIntSet()
+	for _, path := range ds.AllPossibleAccessPaths {
+		if path.Index != nil && path.Index.FullTextInfo != nil {
+			s := intset.NewFastIntSet()
+			for _, col := range path.Index.Columns {
+				s.Insert(int(ds.TableInfo.Columns[col.Offset].ID))
+			}
+			ticiIdx2FastCheck[path.Index] = s
+		}
+	}
+	var matchedIdx *model.IndexInfo
+	var matchedFunc *expression.ScalarFunction
+	var matchedCondPos int
+	matchedColumns := make([]*expression.Column, 0, 2)
+	for i, cond := range ds.PushedDownConds {
+		sf, ok := cond.(*expression.ScalarFunction)
+		if !ok || sf.FuncName.L != ast.FTSMatchWord {
+			if expression.ContainsFullTextSearchFn(cond) {
+				return plannererrors.ErrWrongUsage.FastGen(plannererrors.FTSWrongPlace)
+			}
+			continue
+		}
+		idSetForCheck.Clear()
+		for i := 1; i < len(sf.GetArgs()); i++ {
+			col := sf.GetArgs()[i].(*expression.Column)
+			idSetForCheck.Insert(int(col.ID))
+		}
+		var currentIndex *model.IndexInfo
+		for idx, set := range ticiIdx2FastCheck {
+			// The columns used by the FTS function must be a subset of the index columns.
+			if idSetForCheck.SubsetOf(set) {
+				currentIndex = idx
+				break
+			}
+		}
+		if currentIndex == nil {
+			return errors.New("Full text search can only be used with a matching fulltext index and a columnar storage")
+		}
+		if matchedIdx != nil {
+			return errors.New("Current TiDB doesn't support multiple fulltext search functions used with multiple index calls")
+		}
+		matchedIdx = currentIndex
+		matchedFunc = sf
+		matchedCondPos = i
+		matchedColumns = matchedColumns[:0]
+		for i := 1; i < len(sf.GetArgs()); i++ {
+			col := sf.GetArgs()[i].(*expression.Column)
+			matchedColumns = append(matchedColumns, col)
+		}
+	}
+
+	if matchedIdx == nil {
+		ds.AllPossibleAccessPaths = slices.DeleteFunc(ds.AllPossibleAccessPaths, func(path *util.AccessPath) bool {
+			return path.Index != nil && path.Index.FullTextInfo != nil
+		})
+		ds.PossibleAccessPaths = slices.DeleteFunc(ds.PossibleAccessPaths, func(path *util.AccessPath) bool {
+			return path.Index != nil && path.Index.FullTextInfo != nil
+		})
+		return nil
+	}
+
+	ds.PushedDownConds = slices.Delete(ds.PushedDownConds, matchedCondPos, matchedCondPos+1)
+	// The v8.5 planner may rebuild PossibleAccessPaths from AllPossibleAccessPaths
+	// after logical rules. Keep the FTS-only choice in both slices so the table
+	// path cannot be reintroduced before physical optimization.
+	ds.AllPossibleAccessPaths = slices.DeleteFunc(ds.AllPossibleAccessPaths, func(path *util.AccessPath) bool {
+		return path.Index == nil || path.Index.ID != matchedIdx.ID
+	})
+	pbColumns := make([]*tipb.ColumnInfo, 0, len(matchedColumns))
+	for _, col := range matchedColumns {
+		pbColumns = append(pbColumns, tidbutil.ColumnToProto(col.ToInfo(), false, false))
+	}
+	colNames := make([]string, 0, len(matchedColumns))
+	for _, col := range matchedColumns {
+		colNames = append(colNames, col.OrigName)
+	}
+	ds.buildTiCIFTSPathAndCleanUp(matchedIdx, matchedFunc, pbColumns, colNames)
+	return nil
+}
+
+func (ds *DataSource) buildTiCIFTSPathAndCleanUp(
+	index *model.IndexInfo,
+	ftsFunc *expression.ScalarFunction,
+	pbColumns []*tipb.ColumnInfo,
+	columnNames []string,
+) {
+	// Fulltext index must be used, so prune all other access paths.
+	ds.PossibleAccessPaths = slices.DeleteFunc(ds.PossibleAccessPaths, func(path *util.AccessPath) bool {
+		return path.Index == nil || path.Index.ID != index.ID
+	})
+	ds.PossibleAccessPaths[0].FtsQueryInfo = &tipb.FTSQueryInfo{
+		QueryType:      tipb.FTSQueryType_FTSQueryTypeNoScore,
+		IndexId:        index.ID,
+		Columns:        pbColumns,
+		ColumnNames:    columnNames,
+		QueryText:      ftsFunc.GetArgs()[0].(*expression.Constant).Value.GetString(),
+		QueryTokenizer: string(index.FullTextInfo.ParserType),
+		QueryFunc:      tipb.ScalarFuncSig_FTSMatchWord,
+	}
+	ds.PossibleAccessPaths[0].AccessConds = append(ds.PossibleAccessPaths[0].AccessConds, ftsFunc)
 }

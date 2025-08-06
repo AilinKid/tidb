@@ -1318,6 +1318,14 @@ func getPossibleAccessPaths(ctx base.PlanContext, tableHints *hint.PlanHints, in
 					continue
 				}
 			}
+			// A TiCI fulltext index must remain an index access path here. Its
+			// PhysicalIndexScan is redirected to TiFlash after FTS validation.
+			// Treating it as a generic non-KV path would make IsTablePath classify
+			// it as a plain TiFlash table scan and discard the FTS query info.
+			if index.IsFulltextIndexOnTiCI() {
+				publicPaths = append(publicPaths, &util.AccessPath{Index: index})
+				continue
+			}
 			if index.IsNonKVIndex() {
 				// Because the value of `TiFlashReplica.Available` changes as the user modify replica, it is not ideal if the state of index changes accordingly.
 				// So the current way to use non-KV indexes is to require the TiFlash Replica to be available.

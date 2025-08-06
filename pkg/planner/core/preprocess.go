@@ -961,7 +961,7 @@ func (p *preprocessor) checkCreateTableGrammar(stmt *ast.CreateTableStmt) {
 	}
 	for _, constraint := range stmt.Constraints {
 		switch tp := constraint.Tp; tp {
-		case ast.ConstraintKey, ast.ConstraintIndex, ast.ConstraintUniq, ast.ConstraintUniqKey, ast.ConstraintUniqIndex, ast.ConstraintForeignKey:
+		case ast.ConstraintKey, ast.ConstraintIndex, ast.ConstraintUniq, ast.ConstraintUniqKey, ast.ConstraintUniqIndex, ast.ConstraintForeignKey, ast.ConstraintFulltext:
 			err := checkIndexInfo(constraint.Name, constraint.Keys)
 			if err != nil {
 				p.err = err
@@ -969,6 +969,11 @@ func (p *preprocessor) checkCreateTableGrammar(stmt *ast.CreateTableStmt) {
 			}
 			if constraint.IsEmptyIndex {
 				p.err = dbterror.ErrWrongNameForIndex.GenWithStackByArgs(constraint.Name)
+				return
+			}
+			if constraint.Tp == ast.ConstraintFulltext && constraint.Option != nil && constraint.Option.ParserName.L != "" &&
+				model.GetFullTextParserTypeBySQLName(constraint.Option.ParserName.L) == model.FullTextParserTypeInvalid {
+				p.err = dbterror.ErrUnsupportedIndexType.FastGen("Unsupported parser '%s'", constraint.Option.ParserName.O)
 				return
 			}
 		case ast.ConstraintPrimaryKey:
@@ -1189,6 +1194,11 @@ func (p *preprocessor) checkCreateIndexGrammar(stmt *ast.CreateIndexStmt) {
 		p.err = dbterror.ErrWrongNameForIndex.GenWithStackByArgs(stmt.IndexName)
 		return
 	}
+	if stmt.KeyType == ast.IndexKeyTypeFullText && stmt.IndexOption != nil && stmt.IndexOption.ParserName.L != "" &&
+		model.GetFullTextParserTypeBySQLName(stmt.IndexOption.ParserName.L) == model.FullTextParserTypeInvalid {
+		p.err = dbterror.ErrUnsupportedIndexType.FastGen("Unsupported parser '%s'", stmt.IndexOption.ParserName.O)
+		return
+	}
 	p.err = checkIndexInfo(stmt.IndexName, stmt.IndexPartSpecifications)
 }
 
@@ -1309,9 +1319,14 @@ func (p *preprocessor) checkAlterTableGrammar(stmt *ast.AlterTableStmt) {
 		case ast.AlterTableAddConstraint:
 			switch spec.Constraint.Tp {
 			case ast.ConstraintKey, ast.ConstraintIndex, ast.ConstraintUniq, ast.ConstraintUniqIndex,
-				ast.ConstraintUniqKey, ast.ConstraintPrimaryKey:
+				ast.ConstraintUniqKey, ast.ConstraintPrimaryKey, ast.ConstraintFulltext:
 				p.err = checkIndexInfo(spec.Constraint.Name, spec.Constraint.Keys)
 				if p.err != nil {
+					return
+				}
+				if spec.Constraint.Tp == ast.ConstraintFulltext && spec.Constraint.Option != nil && spec.Constraint.Option.ParserName.L != "" &&
+					model.GetFullTextParserTypeBySQLName(spec.Constraint.Option.ParserName.L) == model.FullTextParserTypeInvalid {
+					p.err = dbterror.ErrUnsupportedIndexType.FastGen("Unsupported parser '%s'", spec.Constraint.Option.ParserName.O)
 					return
 				}
 			default:

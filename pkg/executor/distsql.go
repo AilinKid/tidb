@@ -346,7 +346,7 @@ func (e *IndexReaderExecutor) buildKVRangesForIndexReader() ([]kv.KeyRange, erro
 
 	results := make([]kv.KeyRange, 0, len(groupedRanges))
 	for _, ranges := range groupedRanges {
-		kvRanges, err := buildKeyRanges(e.dctx, ranges, e.partRangeMap, tableIDs, e.index.ID, e.index.IsFulltextIndex(), nil)
+		kvRanges, err := buildKeyRanges(e.dctx, ranges, e.partRangeMap, tableIDs, e.index.ID, e.index.IsFulltextIndexOnTiCI(), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -681,7 +681,7 @@ func (e *IndexLookUpExecutor) buildTableKeyRanges() (err error) {
 	kvRanges := make([][]kv.KeyRange, 0, len(groupedRanges))
 	physicalTblIDsForPartitionKVRanges := make([]int64, 0, len(tableIDs)*len(groupedRanges))
 	for _, ranges := range groupedRanges {
-		kvRange, err := buildKeyRanges(e.dctx, ranges, e.partitionRangeMap, tableIDs, e.index.ID, e.index.IsFulltextIndex(), e.memTracker)
+		kvRange, err := buildKeyRanges(e.dctx, ranges, e.partitionRangeMap, tableIDs, e.index.ID, e.index.IsFulltextIndexOnTiCI(), e.memTracker)
 		if err != nil {
 			return err
 		}
@@ -1115,7 +1115,7 @@ func (e *IndexLookUpExecutor) buildIndexSelectResultForRange(
 		SetAllowBatchCop(e.batchCop).
 		SetStoreType(e.storeType).
 		SetCoprRequestRateLimit(sharedCoprRequestRateLimit)
-	if e.index.IsFulltextIndex() {
+	if e.index.IsFulltextIndexOnTiCI() {
 		builder.SetPaging(false)
 		builder.SetFullText(true)
 		builder.FullTextInfo.TableID = e.table.Meta().ID

@@ -269,9 +269,9 @@ func (index *IndexInfo) IsNonKVIndex() bool {
 	return index.IsTiFlashLocalIndex() || index.FullTextInfo != nil
 }
 
-// IsFulltextIndex checks whether the index is a fulltext index.
+// IsFulltextIndexOnTiCI checks whether the index is a fulltext index.
 // Fulltext indexes only exist in TiCI, so no actual index data is written to the KV layer.
-func (index *IndexInfo) IsFulltextIndex() bool {
+func (index *IndexInfo) IsFulltextIndexOnTiCI() bool {
 	return index.FullTextInfo != nil
 }
 

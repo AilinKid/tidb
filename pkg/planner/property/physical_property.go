@@ -288,12 +288,6 @@ type PhysicalProperty struct {
 		TopK uint32
 	}
 
-	FullTextProp struct {
-		QueryColumns []*expression.Column
-		QueryJSONStr string
-		Limit        int
-	}
-
 	// PartialOrderInfo is used for TopN's partial order optimization.
 	// When this field is not nil, it indicates that prefix index can be used
 	// to provide partial order for TopN.

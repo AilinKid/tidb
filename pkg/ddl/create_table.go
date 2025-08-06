@@ -1333,7 +1333,7 @@ func BuildTableInfo(
 
 	for _, constr := range constraints {
 		var hiddenCols []*model.ColumnInfo
-		if constr.Tp != ast.ConstraintVector {
+		if constr.Tp != ast.ConstraintVector && constr.Tp != ast.ConstraintFulltext {
 			// Build hidden columns if necessary.
 			hiddenCols, err = buildHiddenColumnInfoWithCheck(ctx, constr.Keys, pmodel.NewCIStr(constr.Name), tbInfo, tblColumns)
 			if err != nil {
@@ -1408,7 +1408,22 @@ func BuildTableInfo(
 		}
 
 		if constr.Tp == ast.ConstraintFulltext {
-			ctx.AppendWarning(dbterror.ErrTableCantHandleFt.FastGenByArgs())
+			idxInfo, err := buildFullTextIndexInfo(
+				tbInfo,
+				pmodel.NewCIStr(constr.Name),
+				constr.Keys,
+				constr.Option,
+				model.StatePublic,
+			)
+			if err != nil {
+				return nil, errors.Trace(err)
+			}
+			_, err = validateCommentLength(ctx.GetExprCtx().GetEvalCtx().ErrCtx(), ctx.GetSQLMode(), idxInfo.Name.String(), &idxInfo.Comment, dbterror.ErrTooLongIndexComment)
+			if err != nil {
+				return nil, errors.Trace(err)
+			}
+			idxInfo.ID = AllocateIndexID(tbInfo)
+			tbInfo.Indices = append(tbInfo.Indices, idxInfo)
 			continue
 		}
 

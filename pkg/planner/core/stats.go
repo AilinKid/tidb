@@ -180,6 +180,10 @@ func fillIndexPath(ds *logicalop.DataSource, path *util.AccessPath, conds []expr
 	path.CountAfterAccess = float64(ds.StatisticTable.RealtimeCount)
 	path.IdxCols, path.IdxColLens, path.FullIdxCols, path.FullIdxColLens =
 		util.IndexInfo2Cols(ds.Columns, ds.Schema().Columns, path.Index)
+	if path.Index.FullTextInfo != nil {
+		path.TableFilters = slices.Clone(conds)
+		return nil
+	}
 	if !path.Index.Unique && !path.Index.Primary && len(path.Index.Columns) == len(path.IdxCols) {
 		handleCol := ds.GetPKIsHandleCol()
 		if handleCol != nil && !mysql.HasUnsignedFlag(handleCol.RetType.GetFlag()) {
@@ -204,6 +208,14 @@ func fillIndexPath(ds *logicalop.DataSource, path *util.AccessPath, conds []expr
 	}
 	err := detachCondAndBuildRangeForPath(ds.SCtx(), path, conds, ds.TableStats.HistColl)
 	return err
+}
+
+func deriveSearchPathStats(ds *logicalop.DataSource, path *util.AccessPath) {
+	if ds.SCtx().GetSessionVars().StmtCtx.EnableOptimizerDebugTrace {
+		debugtrace.EnterContextCommon(ds.SCtx())
+		defer debugtrace.LeaveContextCommon(ds.SCtx())
+	}
+	path.CountAfterAccess = min(float64(ds.StatisticTable.RealtimeCount)/10, 1000)
 }
 
 // deriveIndexPathStats will fulfill the information that the AccessPath need.
@@ -600,6 +612,9 @@ func derivePathStatsAndTryHeuristics(ds *logicalop.DataSource) error {
 				return err
 			}
 			path.IsSingleScan = true
+		} else if path.FtsQueryInfo != nil {
+			deriveSearchPathStats(ds, path)
+			path.IsSingleScan = false
 		} else {
 			deriveIndexPathStats(ds, path, ds.PushedDownConds, false)
 			// Reevaluate path.IsSingleScan because it may have been set incorrectly

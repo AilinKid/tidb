@@ -3884,6 +3884,8 @@ ConstraintElem:
 		}
 		if $7 != nil {
 			c.Option = $7.(*ast.IndexOption)
+		} else {
+			c.Option = &ast.IndexOption{}
 		}
 		$$ = c
 	}
@@ -6661,8 +6663,6 @@ IndexOption:
 		$$ = &ast.IndexOption{
 			ParserName: model.NewCIStr($3),
 		}
-		yylex.AppendError(yylex.Errorf("The WITH PARASER clause is parsed but ignored by all storage engines."))
-		parser.lastErrorAsWarn()
 	}
 |	"COMMENT" stringLit
 	{
