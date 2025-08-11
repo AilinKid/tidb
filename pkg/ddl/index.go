@@ -72,6 +72,7 @@ import (
 	"github.com/pingcap/tidb/pkg/table"
 	"github.com/pingcap/tidb/pkg/table/tables"
 	"github.com/pingcap/tidb/pkg/tablecodec"
+	"github.com/pingcap/tidb/pkg/tici"
 	"github.com/pingcap/tidb/pkg/types"
 	"github.com/pingcap/tidb/pkg/util"
 	"github.com/pingcap/tidb/pkg/util/backoff"
@@ -949,8 +950,11 @@ func onCreateFulltextIndex(jobCtx *jobContext, job *model.Job) (ver int64, err e
 			if err != nil {
 				return ver, errors.Trace(err)
 			}
-			err = infosync.CreateFulltextIndex(jobCtx.stepCtx, tblInfo, indexInfo, job.SchemaName)
+			err = tici.CreateFulltextIndex(jobCtx.stepCtx, tblInfo, indexInfo, job.SchemaName)
 			if err != nil {
+				if !isRetryableJobError(err, job.ErrorCount) {
+					return convertAddIdxJob2RollbackJob(jobCtx, job, tbl.Meta(), []*model.IndexInfo{indexInfo}, err)
+				}
 				return ver, errors.Trace(err)
 			}
 			job.SnapshotVer = currVer.Ver
@@ -2185,9 +2189,9 @@ func onDropIndex(jobCtx *jobContext, job *model.Job) (ver int64, _ error) {
 			}
 		}
 		if isFullTextIndex {
-			// Send sync schema notification to TiCI.
+			// Drop full text index on TiCI.
 			for _, indexID := range indexIDs {
-				if err := infosync.DropFullTextIndex(jobCtx.stepCtx, tblInfo.ID, indexID); err != nil {
+				if err := tici.DropFullTextIndex(jobCtx.stepCtx, tblInfo.ID, indexID); err != nil {
 					logutil.DDLLogger().Warn("run drop full text index but dropping index on TiCI failed", zap.Error(err))
 				}
 			}

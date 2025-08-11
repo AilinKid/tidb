@@ -32,7 +32,6 @@ go_library(
         "//pkg/sessionctx/variable",
         "//pkg/store/helper",
         "//pkg/tablecodec",
-        "//pkg/tici",
         "//pkg/util",
         "//pkg/util/codec",
         "//pkg/util/dbterror",
