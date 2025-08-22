@@ -364,7 +364,7 @@ replace (
 	github.com/apache/arrow-go/v18 => github.com/joechenrh/arrow-go/v18 v18.0.0-20250911101656-62c34c9a3b82
 	github.com/go-ldap/ldap/v3 => github.com/YangKeao/ldap/v3 v3.4.5-0.20230421065457-369a3bab1117
 	github.com/pingcap/kvproto => github.com/AilinKid/kvproto v0.0.0-20260902150107-809a4e7a7f1f
-	github.com/pingcap/tipb => github.com/AilinKid/tipb v0.0.0-20260903024624-c8b140052244
+	github.com/pingcap/tipb => github.com/AilinKid/tipb v0.0.0-20260903035542-cc991284c165
 	github.com/pingcap/tidb/pkg/indexer => ./pkg/tici
 	github.com/pingcap/tidb/pkg/parser => ./pkg/parser
 
