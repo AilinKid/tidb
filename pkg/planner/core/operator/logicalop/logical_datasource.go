@@ -847,24 +847,26 @@ func (ds *DataSource) AnalyzeFTSFunc() error {
 		}
 	}
 	var matchedIdx *model.IndexInfo
-	var matchedFunc *expression.ScalarFunction
-	var matchedCondPos int
-	for i, cond := range ds.PushedDownConds {
+	matchedFuncs := make(map[*expression.ScalarFunction]struct{}, 2)
+	for _, cond := range ds.PushedDownConds {
 		sf, ok := cond.(*expression.ScalarFunction)
-		if ok {
-			_, ok = expression.FTSFuncMap[sf.FuncName.L]
-		}
+		// Not a scalar function, go to next one.
 		if !ok {
-			if expression.ContainsFullTextSearchFn(cond) {
-				return plannererrors.ErrWrongUsage.FastGen(plannererrors.FTSWrongPlace)
-			}
 			continue
 		}
-		idSetForCheck.Clear()
-		for i := 1; i < len(sf.GetArgs()); i++ {
-			col := sf.GetArgs()[i].(*expression.Column)
-			idSetForCheck.Insert(int(col.ID))
+		_, isSingleFTS := expression.FTSFuncMap[sf.FuncName.L]
+		if !isSingleFTS {
+			containsFTS := expression.ContainsFullTextSearchFn(cond)
+			if !containsFTS {
+				continue
+			}
+			onlyLogicOpAndFTS := expression.ExprOnlyContainsLogicOpAndFTS(cond)
+			if containsFTS && !onlyLogicOpAndFTS {
+				return plannererrors.ErrWrongUsage.FastGen(plannererrors.FTSWrongPlace)
+			}
 		}
+		idSetForCheck.Clear()
+		expression.CollectColumnIDForFTS(sf, &idSetForCheck)
 		var currentIndex *model.IndexInfo
 		for idx, set := range ticiIdx2FastCheck {
 			// The columns used by the FTS function must be a subset of the index columns.
@@ -876,12 +878,12 @@ func (ds *DataSource) AnalyzeFTSFunc() error {
 		if currentIndex == nil {
 			return errors.New("Full text search can only be used with a matching fulltext index and a columnar storage")
 		}
-		if matchedIdx != nil {
+		// Currently TiDB doesn't support multiple fulltext search functions used with multiple index calls.
+		if matchedIdx != nil && matchedIdx.ID != currentIndex.ID {
 			return errors.New("Current TiDB doesn't support multiple fulltext search functions used with multiple index calls")
 		}
 		matchedIdx = currentIndex
-		matchedFunc = sf
-		matchedCondPos = i
+		matchedFuncs[sf] = struct{}{}
 	}
 
 	if matchedIdx == nil {
@@ -893,20 +895,27 @@ func (ds *DataSource) AnalyzeFTSFunc() error {
 		})
 		return nil
 	}
-
-	ds.PushedDownConds = slices.Delete(ds.PushedDownConds, matchedCondPos, matchedCondPos+1)
+	// Remove the matched conditions from PushedDownConds.
+	ds.PushedDownConds = slices.DeleteFunc(ds.PushedDownConds, func(cond expression.Expression) bool {
+		sf, ok := cond.(*expression.ScalarFunction)
+		if !ok {
+			return false
+		}
+		_, ok = matchedFuncs[sf]
+		return ok
+	})
 	// The v8.5 planner may rebuild PossibleAccessPaths from AllPossibleAccessPaths
 	// after logical rules. Keep the FTS-only choice in both slices so the table
 	// path cannot be reintroduced before physical optimization.
 	ds.AllPossibleAccessPaths = slices.DeleteFunc(ds.AllPossibleAccessPaths, func(path *util.AccessPath) bool {
 		return path.Index == nil || path.Index.ID != matchedIdx.ID
 	})
-	return ds.buildTiCIFTSPathAndCleanUp(matchedIdx, matchedFunc)
+	return ds.buildTiCIFTSPathAndCleanUp(matchedIdx, matchedFuncs)
 }
 
 func (ds *DataSource) buildTiCIFTSPathAndCleanUp(
 	index *model.IndexInfo,
-	ftsFunc *expression.ScalarFunction,
+	ftsFuncs map[*expression.ScalarFunction]struct{},
 ) error {
 	// Fulltext index must be used, so prune all other access paths.
 	ds.PossibleAccessPaths = slices.DeleteFunc(ds.PossibleAccessPaths, func(path *util.AccessPath) bool {
@@ -916,10 +925,14 @@ func (ds *DataSource) buildTiCIFTSPathAndCleanUp(
 	evalCtx := ds.SCtx().GetExprCtx().GetEvalCtx()
 	client := ds.SCtx().GetBuildPBCtx().Client
 	pbConverter := expression.NewPBConverterForTiCI(client, evalCtx)
-	pbExpr := pbConverter.ExprToPB(ftsFunc)
-	if pbExpr == nil {
-		// If the expression is not converted to PB, we should return an error.
-		return errors.New("Failed to convert FTS function to PB expression")
+	pbExprs := make([]tipb.Expr, 0, len(ftsFuncs))
+	for ftsFunc := range ftsFuncs {
+		pbExpr := pbConverter.ExprToPB(ftsFunc)
+		if pbExpr == nil {
+			// If the expression is not converted to PB, we should return an error.
+			return errors.New("Failed to convert FTS function to PB expression")
+		}
+		pbExprs = append(pbExprs, *pbExpr)
 	}
 
 	// Build tipb protobuf info for the matched index.
@@ -927,9 +940,11 @@ func (ds *DataSource) buildTiCIFTSPathAndCleanUp(
 		QueryType:      tipb.FTSQueryType_FTSQueryTypeNoScore,
 		IndexId:        index.ID,
 		QueryTokenizer: string(index.FullTextInfo.ParserType),
-		MatchExpr:      []tipb.Expr{*pbExpr},
+		MatchExpr:      pbExprs,
 	}
 
-	ds.PossibleAccessPaths[0].AccessConds = append(ds.PossibleAccessPaths[0].AccessConds, ftsFunc)
+	for ftsFunc := range ftsFuncs {
+		ds.PossibleAccessPaths[0].AccessConds = append(ds.PossibleAccessPaths[0].AccessConds, ftsFunc)
+	}
 	return nil
 }
