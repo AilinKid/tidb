@@ -403,6 +403,8 @@ const (
 	TiFlash
 	// TiDB means the type of a store is TiDB.
 	TiDB
+	// TiCI means the type of store engine is TiCI, the search engine.
+	TiCI
 	// UnSpecified means the store type is unknown
 	UnSpecified = 255
 )
@@ -415,6 +417,8 @@ func (t StoreType) Name() string {
 		return "tidb"
 	} else if t == TiKV {
 		return "tikv"
+	} else if t == TiCI {
+		return "tici"
 	}
 	return "unspecified"
 }

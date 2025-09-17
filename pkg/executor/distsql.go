@@ -372,6 +372,17 @@ func (e *IndexReaderExecutor) buildKVReq(r []kv.KeyRange) (*kv.Request, error) {
 		SetMemTracker(e.memTracker).
 		SetClosestReplicaReadAdjuster(newClosestReadAdjuster(e.dctx, &builder.Request, e.netDataSize)).
 		SetConnIDAndConnAlias(e.dctx.ConnectionID, e.dctx.SessionAlias)
+	if e.index.IsFulltextIndexOnTiCI() {
+		builder.SetStoreType(kv.TiFlash).SetPaging(false).SetFullText(true).SetAllowBatchCop(true)
+		builder.FullTextInfo.TableID = e.table.Meta().ID
+		builder.FullTextInfo.IndexID = e.index.ID
+		builder.FullTextInfo.ExecutorID = e.plans[0].ExplainID().String()
+
+		id := e.Table().Meta().ID
+		startKey := tablecodec.EncodeTablePrefix(id)
+		endKey := tablecodec.EncodeTablePrefix(id + 1)
+		builder.SetKeyRanges([]kv.KeyRange{{StartKey: startKey, EndKey: endKey}})
+	}
 	kvReq, err := builder.Build()
 	return kvReq, err
 }
@@ -379,7 +390,19 @@ func (e *IndexReaderExecutor) buildKVReq(r []kv.KeyRange) (*kv.Request, error) {
 func (e *IndexReaderExecutor) open(ctx context.Context, kvRanges []kv.KeyRange) error {
 	var err error
 	if e.corColInFilter {
-		e.dagPB.Executors, err = builder.ConstructListBasedDistExec(e.buildPBCtx, e.plans)
+		if !e.index.IsFulltextIndexOnTiCI() {
+			e.dagPB.Executors, err = builder.ConstructListBasedDistExec(e.buildPBCtx, e.plans)
+		} else {
+			var executors []*tipb.Executor
+			executors, err = builder.ConstructTreeBasedDistExec(e.buildPBCtx, e.plans[len(e.plans)-1])
+			if err == nil {
+				if len(executors) == 0 {
+					err = errors.New("empty TiCI index executor tree")
+				} else {
+					e.dagPB.RootExecutor = executors[0]
+				}
+			}
+		}
 		if err != nil {
 			return err
 		}
@@ -726,7 +749,7 @@ func (e *IndexLookUpExecutor) open(_ context.Context) error {
 
 	var err error
 	if e.corColInIdxSide {
-		if e.storeType == kv.TiFlash {
+		if e.index.IsFulltextIndexOnTiCI() || e.storeType == kv.TiFlash {
 			var executors []*tipb.Executor
 			executors, err = builder.ConstructTreeBasedDistExec(e.buildPBCtx, e.idxPlans[len(e.idxPlans)-1])
 			if err == nil {
@@ -1116,8 +1139,7 @@ func (e *IndexLookUpExecutor) buildIndexSelectResultForRange(
 		SetStoreType(e.storeType).
 		SetCoprRequestRateLimit(sharedCoprRequestRateLimit)
 	if e.index.IsFulltextIndexOnTiCI() {
-		builder.SetPaging(false)
-		builder.SetFullText(true)
+		builder.SetPaging(false).SetFullText(true).SetAllowBatchCop(true).SetStoreType(kv.TiFlash)
 		builder.FullTextInfo.TableID = e.table.Meta().ID
 		builder.FullTextInfo.IndexID = e.index.ID
 		builder.FullTextInfo.ExecutorID = e.idxPlans[0].ExplainID().String()

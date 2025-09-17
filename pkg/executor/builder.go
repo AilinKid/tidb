@@ -4044,11 +4044,17 @@ func (builder *dataReaderBuilder) prunePartitionForInnerExecutor(tbl table.Table
 }
 
 func buildNoRangeIndexReader(b *executorBuilder, v *plannercore.PhysicalIndexReader) (*IndexReaderExecutor, error) {
-	dagReq, err := builder.ConstructDAGReq(b.sctx, v.IndexPlans, kv.TiKV)
+	is := v.IndexPlans[0].(*plannercore.PhysicalIndexScan)
+	indexPlans := v.IndexPlans
+	storeType := kv.TiKV
+	if is.Index.IsFulltextIndexOnTiCI() {
+		indexPlans = []base.PhysicalPlan{v.IndexPlans[len(v.IndexPlans)-1]}
+		storeType = kv.TiFlash
+	}
+	dagReq, err := builder.ConstructDAGReq(b.sctx, indexPlans, storeType)
 	if err != nil {
 		return nil, err
 	}
-	is := v.IndexPlans[0].(*plannercore.PhysicalIndexScan)
 	tbl, _ := b.is.TableByID(context.Background(), is.Table.ID)
 	isPartition, physicalTableID := is.IsPartition()
 	if isPartition {
@@ -4285,6 +4291,8 @@ func buildNoRangeIndexLookUpReader(b *executorBuilder, v *plannercore.PhysicalIn
 	var err error
 	if v.IndexLookUpPushDown {
 		indexReq, err = buildIndexLookUpPushDownDAGReq(b.sctx, is.Index.Columns, handleLen, v.IndexPlans, v.IndexPlansUnNatureOrders)
+	} else if is.Index.IsFulltextIndexOnTiCI() {
+		indexReq, err = buildIndexReq(b.sctx, is.Index.Columns, handleLen, v.IndexPlans[len(v.IndexPlans)-1:])
 	} else {
 		indexReq, err = buildIndexReq(b.sctx, is.Index.Columns, handleLen, v.IndexPlans)
 	}

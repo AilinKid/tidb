@@ -2524,6 +2524,31 @@ func isSingleScan(lp base.LogicalPlan, indexColumns []*expression.Column, idxCol
 	return true
 }
 
+func isHandleCoveringColumns(ds *logicalop.DataSource, columns []*expression.Column) bool {
+	evalCtx := ds.SCtx().GetExprCtx().GetEvalCtx()
+	for _, col := range columns {
+		if ds.TableInfo.PKIsHandle && mysql.HasPriKeyFlag(col.RetType.GetFlag()) {
+			continue
+		}
+		if col.ID == model.ExtraHandleID || col.ID == model.ExtraPhysTblID {
+			continue
+		}
+		if isIndexColsCoveringCol(evalCtx, col, ds.CommonHandleCols, ds.CommonHandleLens, false) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func isTiCISingleScan(ds *logicalop.DataSource) bool {
+	// No residual filter can be calculated in TiCI.
+	if len(ds.PushedDownConds) > 0 {
+		return false
+	}
+	return isHandleCoveringColumns(ds, ds.Schema().Columns)
+}
+
 // If there is a table reader which needs to keep order, we should append a pk to table scan.
 func (ts *PhysicalTableScan) appendExtraHandleCol(ds *logicalop.DataSource) (*expression.Column, bool) {
 	handleCols := ds.HandleCols
@@ -3501,7 +3526,7 @@ func getOriginalPhysicalIndexScan(ds *logicalop.DataSource, prop *property.Physi
 		FtsQueryInfo:     path.FtsQueryInfo,
 	}.Init(ds.SCtx(), ds.QueryBlockOffset())
 	if is.FtsQueryInfo != nil {
-		is.StoreType = kv.TiFlash
+		is.StoreType = kv.TiCI
 	}
 	rowCount := path.CountAfterAccess
 	is.initSchema(append(path.FullIdxCols, ds.CommonHandleCols...), !isSingleScan)

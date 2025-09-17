@@ -357,6 +357,8 @@ type PhysicalIndexReader struct {
 
 	// Used by partition table.
 	PlanPartInfo *PhysPlanPartInfo
+
+	StoreType kv.StoreType
 }
 
 // Clone implements op.PhysicalPlan interface.

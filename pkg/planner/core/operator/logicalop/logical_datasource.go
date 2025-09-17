@@ -904,6 +904,8 @@ func (ds *DataSource) AnalyzeFTSFunc() error {
 		_, ok = matchedFuncs[sf]
 		return ok
 	})
+	// Re-construct AllConds because column pruning relies on it.
+	ds.AllConds = slices.Clone(ds.PushedDownConds)
 	// The v8.5 planner may rebuild PossibleAccessPaths from AllPossibleAccessPaths
 	// after logical rules. Keep the FTS-only choice in both slices so the table
 	// path cannot be reintroduced before physical optimization.

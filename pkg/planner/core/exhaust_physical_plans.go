@@ -2325,6 +2325,12 @@ func pushLimitOrTopNForcibly(p base.LogicalPlan, isPhysicalLimit bool) bool {
 		return false
 	}
 
+	if *preferPushDown && hasTiCISingleReadPath(p) {
+		p.SCtx().GetSessionVars().StmtCtx.SetHintWarning("Optimizer Hint LIMIT_TO_COP is inapplicable")
+		*preferPushDown = false
+		return false
+	}
+
 	if *preferPushDown || meetThreshold {
 		if p.CanPushToCop(kv.TiKV) {
 			return true
@@ -2335,6 +2341,22 @@ func pushLimitOrTopNForcibly(p base.LogicalPlan, isPhysicalLimit bool) bool {
 		}
 	}
 
+	return false
+}
+
+func hasTiCISingleReadPath(p base.LogicalPlan) bool {
+	if ds, ok := p.(*logicalop.DataSource); ok {
+		for _, path := range ds.PossibleAccessPaths {
+			if path.FtsQueryInfo != nil && path.IsSingleScan {
+				return true
+			}
+		}
+	}
+	for _, child := range p.Children() {
+		if hasTiCISingleReadPath(child) {
+			return true
+		}
+	}
 	return false
 }
 
