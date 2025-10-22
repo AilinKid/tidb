@@ -19,14 +19,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"sync/atomic"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pingcap/errors"
 	sst "github.com/pingcap/kvproto/pkg/import_sstpb"
 	"github.com/pingcap/tidb/br/pkg/storage"
+	tidbconfig "github.com/pingcap/tidb/pkg/config"
 	"github.com/pingcap/tidb/pkg/meta/model"
+	"github.com/pingcap/tidb/pkg/util"
 	"github.com/pingcap/tidb/pkg/util/etcd"
 	"github.com/pingcap/tidb/pkg/util/logutil"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 )
 
@@ -86,6 +90,29 @@ type DataWriterGroup struct {
 	writable   atomic.Bool
 	mgrCtx     *ManagerCtx
 	etcdClient *etcd.Client
+}
+
+const etcdDialTimeout = 5 * time.Second
+
+func getEtcdClient() (*clientv3.Client, error) {
+	tidbCfg := tidbconfig.GetGlobalConfig()
+	tls, err := util.NewTLSConfig(
+		util.WithCAPath(tidbCfg.Security.ClusterSSLCA),
+		util.WithCertAndKeyPath(tidbCfg.Security.ClusterSSLCert, tidbCfg.Security.ClusterSSLKey),
+	)
+	if err != nil {
+		return nil, err
+	}
+	etcdEndpoints, err := util.ParseHostPortAddr(tidbCfg.Path)
+	if err != nil {
+		return nil, err
+	}
+	return clientv3.New(clientv3.Config{
+		Endpoints:        etcdEndpoints,
+		DialTimeout:      etcdDialTimeout,
+		TLS:              tls,
+		AutoSyncInterval: 30 * time.Second,
+	})
 }
 
 // NewTiCIDataWriterGroup constructs a DataWriterGroup covering all full-text

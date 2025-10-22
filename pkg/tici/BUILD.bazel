@@ -13,11 +13,12 @@ go_library(
     deps = [
         "//br/pkg/membuf",
         "//br/pkg/storage",
-        "//pkg/domain/infosync",
+        "//pkg/config",
         "//pkg/kv",
         "//pkg/meta/model",
         "//pkg/metrics",
         "//pkg/parser/mysql",
+        "//pkg/util",
         "//pkg/util/dbterror",
         "//pkg/util/etcd",
         "//pkg/util/intest",
