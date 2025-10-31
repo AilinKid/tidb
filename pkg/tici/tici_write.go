@@ -125,7 +125,7 @@ func getEtcdClient() (*clientv3.Client, error) {
 // of which engine is currently being written. Addressing this would require
 // significant changes to the import-into interface and should be considered
 // in longer-term architectural improvements.
-func NewTiCIDataWriterGroup(ctx context.Context, getEtcdClient func() (*etcd.Client, error), tblInfo *model.TableInfo, schema string, tidbTaskID string) (*DataWriterGroup, error) {
+func NewTiCIDataWriterGroup(ctx context.Context, getEtcdClient func() (*etcd.Client, error), tblInfo *model.TableInfo, schema string, tidbTaskID string, keyspaceID uint32) (*DataWriterGroup, error) {
 	fulltextIndexes := GetFulltextIndexes(tblInfo)
 	if len(fulltextIndexes) == 0 {
 		return nil, nil // No full-text indexes, no writers needed
@@ -150,6 +150,7 @@ func NewTiCIDataWriterGroup(ctx context.Context, getEtcdClient func() (*etcd.Cli
 	if err != nil {
 		return nil, err
 	}
+	mgrCtx.SetKeyspaceID(keyspaceID)
 
 	indexMeta, err := NewTiCIIndexMeta(ctx, tblInfo, fulltextIndexIDs, schema, tidbTaskID, mgrCtx)
 	if err != nil {
