@@ -1194,6 +1194,16 @@ func (p *preprocessor) checkCreateIndexGrammar(stmt *ast.CreateIndexStmt) {
 		p.err = dbterror.ErrWrongNameForIndex.GenWithStackByArgs(stmt.IndexName)
 		return
 	}
+	if stmt.IndexOption != nil {
+		if stmt.IndexOption.TiCIParameter != "" && stmt.KeyType != ast.IndexKeyTypeFullText && stmt.KeyType != ast.IndexKeyTypeHybrid {
+			p.err = dbterror.ErrUnsupportedIndexType.FastGen("PARAMETER is only supported for FULLTEXT/HYBRID INDEX")
+			return
+		}
+		if stmt.KeyType == ast.IndexKeyTypeHybrid && stmt.IndexOption.Tp != pmodel.IndexTypeInvalid {
+			p.err = dbterror.ErrUnsupportedIndexType.FastGen("'USING %s' is not supported for HYBRID INDEX", stmt.IndexOption.Tp)
+			return
+		}
+	}
 	if stmt.KeyType == ast.IndexKeyTypeFullText && stmt.IndexOption != nil && stmt.IndexOption.ParserName.L != "" &&
 		model.GetFullTextParserTypeBySQLName(stmt.IndexOption.ParserName.L) == model.FullTextParserTypeInvalid {
 		p.err = dbterror.ErrUnsupportedIndexType.FastGen("Unsupported parser '%s'", stmt.IndexOption.ParserName.O)
@@ -1319,7 +1329,7 @@ func (p *preprocessor) checkAlterTableGrammar(stmt *ast.AlterTableStmt) {
 		case ast.AlterTableAddConstraint:
 			switch spec.Constraint.Tp {
 			case ast.ConstraintKey, ast.ConstraintIndex, ast.ConstraintUniq, ast.ConstraintUniqIndex,
-				ast.ConstraintUniqKey, ast.ConstraintPrimaryKey, ast.ConstraintFulltext:
+				ast.ConstraintUniqKey, ast.ConstraintPrimaryKey, ast.ConstraintFulltext, ast.ConstraintHybrid:
 				p.err = checkIndexInfo(spec.Constraint.Name, spec.Constraint.Keys)
 				if p.err != nil {
 					return
@@ -1328,6 +1338,16 @@ func (p *preprocessor) checkAlterTableGrammar(stmt *ast.AlterTableStmt) {
 					model.GetFullTextParserTypeBySQLName(spec.Constraint.Option.ParserName.L) == model.FullTextParserTypeInvalid {
 					p.err = dbterror.ErrUnsupportedIndexType.FastGen("Unsupported parser '%s'", spec.Constraint.Option.ParserName.O)
 					return
+				}
+				if spec.Constraint.Option != nil {
+					if spec.Constraint.Option.TiCIParameter != "" && spec.Constraint.Tp != ast.ConstraintFulltext && spec.Constraint.Tp != ast.ConstraintHybrid {
+						p.err = dbterror.ErrUnsupportedIndexType.FastGen("PARAMETER is only supported for FULLTEXT/HYBRID INDEX")
+						return
+					}
+					if spec.Constraint.Tp == ast.ConstraintHybrid && spec.Constraint.Option.Tp != pmodel.IndexTypeInvalid {
+						p.err = dbterror.ErrUnsupportedIndexType.FastGen("'USING %s' is not supported for HYBRID INDEX", spec.Constraint.Option.Tp)
+						return
+					}
 				}
 			default:
 				// Nothing to do now.

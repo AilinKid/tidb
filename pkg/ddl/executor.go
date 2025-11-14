@@ -1788,6 +1788,8 @@ func (e *executor) AlterTable(ctx context.Context, sctx sessionctx.Context, stmt
 				err = e.CreatePrimaryKey(sctx, ident, pmodel.NewCIStr(constr.Name), spec.Constraint.Keys, constr.Option)
 			case ast.ConstraintFulltext:
 				err = e.createFullTextIndex(sctx, ident, pmodel.NewCIStr(constr.Name), spec.Constraint.Keys, constr.Option, constr.IfNotExists)
+			case ast.ConstraintHybrid:
+				err = e.createHybridIndex(sctx, ident, pmodel.NewCIStr(constr.Name), spec.Constraint.Keys, constr.Option, constr.IfNotExists)
 			case ast.ConstraintCheck:
 				if !variable.EnableCheckConstraint.Load() {
 					sctx.GetSessionVars().StmtCtx.AppendWarning(errCheckConstraintIsOff)
@@ -4811,6 +4813,60 @@ func (e *executor) createFullTextIndex(ctx sessionctx.Context, ti ast.Ident, ind
 	return errors.Trace(err)
 }
 
+func (e *executor) createHybridIndex(ctx sessionctx.Context, ti ast.Ident, indexName pmodel.CIStr,
+	indexPartSpecifications []*ast.IndexPartSpecification, indexOption *ast.IndexOption, ifNotExists bool) error {
+	schema, t, err := e.getSchemaAndTableByIdent(ti)
+	if err != nil {
+		return errors.Trace(err)
+	}
+
+	tblInfo := t.Meta()
+	if err := checkTableTypeForFulltextIndex(tblInfo); err != nil {
+		return errors.Trace(err)
+	}
+
+	metaBuildCtx := NewMetaBuildContextWithSctx(ctx)
+	indexName, _, err = checkIndexNameAndColumns(metaBuildCtx, t, indexName, indexPartSpecifications, false, ifNotExists)
+	if err != nil || indexName.L == "" {
+		return errors.Trace(err)
+	}
+	if indexOption == nil {
+		indexOption = &ast.IndexOption{}
+	}
+	indexOption.Tp = pmodel.IndexTypeHybrid
+	if _, err := buildHybridInfoWithCheck(indexPartSpecifications, indexOption, tblInfo); err != nil {
+		return errors.Trace(err)
+	}
+	if _, _, err := buildIndexColumns(metaBuildCtx, tblInfo.Columns, indexPartSpecifications, false); err != nil {
+		return errors.Trace(err)
+	}
+
+	sessionVars := ctx.GetSessionVars()
+	if _, err = validateCommentLength(sessionVars.StmtCtx.ErrCtx(), sessionVars.SQLMode, indexName.String(), &indexOption.Comment, dbterror.ErrTooLongTableComment); err != nil {
+		return errors.Trace(err)
+	}
+
+	job := buildAddIndexJobWithoutTypeAndArgs(ctx, schema, t)
+	job.Version = model.GetJobVerInUse()
+	job.Type = model.ActionAddHybridIndex
+
+	args := &model.ModifyIndexArgs{
+		IndexArgs: []*model.IndexArg{{
+			IndexName:               indexName,
+			IndexPartSpecifications: indexPartSpecifications,
+			IndexOption:             indexOption,
+		}},
+		OpType: model.OpAddIndex,
+	}
+
+	err = e.doDDLJob2(ctx, job, args)
+	if dbterror.ErrDupKeyName.Equal(err) && ifNotExists {
+		ctx.GetSessionVars().StmtCtx.AppendNote(err)
+		return nil
+	}
+	return errors.Trace(err)
+}
+
 func checkIndexNameAndColumns(ctx *metabuild.Context, t table.Table, indexName pmodel.CIStr,
 	indexPartSpecifications []*ast.IndexPartSpecification, isVector, ifNotExists bool) (pmodel.CIStr, []*model.ColumnInfo, error) {
 	// Deal with anonymous index.
@@ -4992,6 +5048,9 @@ func (e *executor) createIndex(ctx sessionctx.Context, ti ast.Ident, keyType ast
 	}
 	if keyType == ast.IndexKeyTypeFullText {
 		return e.createFullTextIndex(ctx, ti, indexName, indexPartSpecifications, indexOption, ifNotExists)
+	}
+	if keyType == ast.IndexKeyTypeHybrid {
+		return e.createHybridIndex(ctx, ti, indexName, indexPartSpecifications, indexOption, ifNotExists)
 	}
 	if keyType == ast.IndexKeyTypeVector {
 		return e.createVectorIndex(ctx, ti, indexName, indexPartSpecifications, indexOption, ifNotExists)
