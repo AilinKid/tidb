@@ -1143,11 +1143,6 @@ func (e *IndexLookUpExecutor) buildIndexSelectResultForRange(
 		builder.FullTextInfo.TableID = e.table.Meta().ID
 		builder.FullTextInfo.IndexID = e.index.ID
 		builder.FullTextInfo.ExecutorID = e.idxPlans[0].ExplainID().String()
-
-		id := e.Table().Meta().ID
-		startKey := tablecodec.EncodeTablePrefix(id)
-		endKey := tablecodec.EncodeTablePrefix(id + 1)
-		kvRange = []kv.KeyRange{{StartKey: startKey, EndKey: endKey}}
 	}
 
 	if e.indexLookUpPushDown {
