@@ -1794,7 +1794,7 @@ func (b *PlanBuilder) buildPhysicalIndexLookUpReader(_ context.Context, dbName p
 			is.Columns = append(is.Columns, c.ColumnInfo)
 		}
 	}
-	is.initSchema(append(is.IdxCols, commonCols...), true)
+	is.initSchemaForTiKVIndex(append(is.IdxCols, commonCols...), true)
 
 	// It's double read case.
 	ts := PhysicalTableScan{

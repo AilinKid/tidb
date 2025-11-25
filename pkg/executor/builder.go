@@ -4267,6 +4267,16 @@ func buildIndexScanOutputOffsets(p *plannercore.PhysicalIndexScan, columns []*mo
 		}
 	}
 
+	if p.Index.IsFulltextIndexOnTiCI() {
+		return handleOutputOffsetsForTiCIIndexLookUp(outputOffsets, handleLen), nil
+	}
+
+	return handleOutputOffsetsForTiKVIndexLookUp(outputOffsets, handleLen, columns, p.NeedExtraOutputCol()), nil
+}
+
+// handleOutputOffsetsForTiKVIndexLookUp handles the output offsets for TiKV index look up requests.
+// See initSchemaForTiKVIndex for the row layout.
+func handleOutputOffsetsForTiKVIndexLookUp(outputOffsets []uint32, handleLen int, columns []*model.IndexColumn, needExtraOutputCol bool) []uint32 {
 	for i := range handleLen {
 		outputOffsets = append(outputOffsets, uint32(len(columns)+i))
 	}
@@ -4275,7 +4285,16 @@ func buildIndexScanOutputOffsets(p *plannercore.PhysicalIndexScan, columns []*mo
 		// need add one more column for pid or physical table id
 		outputOffsets = append(outputOffsets, uint32(len(columns)+handleLen))
 	}
-	return outputOffsets, nil
+	return outputOffsets
+}
+
+// handleOutputOffsetsForTiCIIndexLookUp handles the output offsets for TiCI index look up requests.
+// See initSchemaForTiCIIndex for the row layout.
+func handleOutputOffsetsForTiCIIndexLookUp(outputOffsets []uint32, handleLen int) []uint32 {
+	for i := range handleLen {
+		outputOffsets = append(outputOffsets, uint32(i))
+	}
+	return outputOffsets
 }
 
 func buildNoRangeIndexLookUpReader(b *executorBuilder, v *plannercore.PhysicalIndexLookUpReader) (*IndexLookUpExecutor, error) {
