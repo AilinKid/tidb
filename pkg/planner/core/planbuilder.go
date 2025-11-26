@@ -1322,7 +1322,7 @@ func getPossibleAccessPaths(ctx base.PlanContext, tableHints *hint.PlanHints, in
 			// PhysicalIndexScan is redirected to TiFlash after FTS validation.
 			// Treating it as a generic non-KV path would make IsTablePath classify
 			// it as a plain TiFlash table scan and discard the FTS query info.
-			if index.IsFulltextIndexOnTiCI() {
+			if index.IsTiCIIndex() {
 				publicPaths = append(publicPaths, &util.AccessPath{Index: index})
 				continue
 			}

@@ -3543,7 +3543,7 @@ func getOriginalPhysicalIndexScan(ds *logicalop.DataSource, prop *property.Physi
 		Index:            idx,
 		IdxCols:          path.IdxCols,
 		IdxColLens:       path.IdxColLens,
-		FullText:         idx.IsFulltextIndexOnTiCI(),
+		FullText:         idx.IsTiCIIndex(),
 		AccessCondition:  path.AccessConds,
 		Ranges:           path.Ranges,
 		dataSourceSchema: ds.Schema(),

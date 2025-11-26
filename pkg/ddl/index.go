@@ -2967,7 +2967,7 @@ func onDropIndex(jobCtx *jobContext, job *model.Job) (ver int64, _ error) {
 			if indexInfo.IsTiFlashLocalIndex() {
 				isTiFlashIndex = true
 			}
-			if indexInfo.IsFulltextIndexOnTiCI() {
+			if indexInfo.IsTiCIIndex() {
 				isFullTextIndex = true
 			}
 			indexInfo.State = model.StateNone
