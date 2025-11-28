@@ -223,6 +223,20 @@ func (mr *MockBackendMockRecorder) OpenEngine(ctx, config, engineUUID any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OpenEngine", reflect.TypeOf((*MockBackend)(nil).OpenEngine), ctx, config, engineUUID)
 }
 
+// PostProcess mocks base method.
+func (m *MockBackend) PostProcess(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PostProcess", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PostProcess indicates an expected call of PostProcess.
+func (mr *MockBackendMockRecorder) PostProcess(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProcess", reflect.TypeOf((*MockBackend)(nil).PostProcess), ctx)
+}
+
 // ResetEngine mocks base method.
 func (m *MockBackend) ResetEngine(arg0 context.Context, arg1 uuid.UUID) error {
 	m.ctrl.T.Helper()

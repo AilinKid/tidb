@@ -823,6 +823,16 @@ func (*Backend) ShouldPostProcess() bool {
 	return true
 }
 
+// PostProcess performs post-processing tasks after all engines are imported.
+// This includes finishing the TiCI index upload.
+func (local *Backend) PostProcess(ctx context.Context) error {
+	if local.ticiWriteGroup != nil {
+		// FinishIndexUpload should be called in the post process phase after all engines are imported.
+		return local.ticiWriteGroup.FinishIndexUpload(ctx)
+	}
+	return nil
+}
+
 // OpenEngine must be called with holding mutex of Engine.
 func (local *Backend) OpenEngine(ctx context.Context, cfg *backend.EngineConfig, engineUUID uuid.UUID) error {
 	return local.engineMgr.openEngine(ctx, cfg, engineUUID)
@@ -1741,17 +1751,7 @@ func (local *Backend) doImport(
 		log.FromContext(ctx).Error("do import meets error", zap.Error(err))
 	}
 
-	if err != nil {
-		return err
-	}
-
-	if local.ticiWriteGroup != nil {
-		// FIXME: this API should be called in the post process phase.
-		// If the import is done, we can close the write group.
-		return local.ticiWriteGroup.FinishIndexUpload(ctx)
-	}
-
-	return nil
+	return err
 }
 
 // GetImportedKVCount returns the number of imported KV pairs of some engine.

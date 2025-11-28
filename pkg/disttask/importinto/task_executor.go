@@ -617,7 +617,7 @@ func (p *postProcessStepExecutor) RunSubtask(ctx context.Context, subtask *proto
 	failpoint.Inject("waitBeforePostProcess", func() {
 		time.Sleep(5 * time.Second)
 	})
-	return postProcess(ctx, p.store, p.taskMeta, &stepMeta, logger)
+	return postProcess(ctx, p.taskID, p.store, p.taskMeta, &stepMeta, logger)
 }
 
 type importExecutor struct {

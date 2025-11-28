@@ -101,7 +101,7 @@ func (e *importMinimalTaskExecutor) Run(ctx context.Context, dataWriter, indexWr
 }
 
 // postProcess does the post-processing for the task.
-func postProcess(ctx context.Context, store kv.Storage, taskMeta *TaskMeta, subtaskMeta *PostProcessStepMeta, logger *zap.Logger) (err error) {
+func postProcess(ctx context.Context, taskID int64, store kv.Storage, taskMeta *TaskMeta, subtaskMeta *PostProcessStepMeta, logger *zap.Logger) (err error) {
 	failpoint.InjectCall("syncBeforePostProcess", taskMeta.JobID)
 
 	callLog := log.BeginTask(logger, "post process")
@@ -119,6 +119,28 @@ func postProcess(ctx context.Context, store kv.Storage, taskMeta *TaskMeta, subt
 	// 	err2 := createTableIndexes(ctx, globalTaskManager, taskMeta, logger)
 	// 	err = multierr.Append(err, err2)
 	// }()
+
+	// Call Backend.PostProcess to finish TiCI index upload if needed.
+	// This should be called after all engines are imported.
+	// Recreate TableImporter because the post-process and import steps use different executors.
+	// NewTableImporter initializes the TiCI writer group with the same task ID and therefore
+	// reconnects to the same TiCI job.
+	tableImporter, err := getTableImporter(ctx, taskID, taskMeta, store)
+	if err != nil {
+		logger.Warn("failed to get table importer for post process", zap.Error(err))
+		// Continue with other post process steps even if we can't get table importer
+	} else {
+		defer func() {
+			if closeErr := tableImporter.Close(); closeErr != nil {
+				logger.Warn("failed to close table importer", zap.Error(closeErr))
+			}
+		}()
+		if backend := tableImporter.Backend(); backend != nil {
+			if err := backend.PostProcess(ctx); err != nil {
+				return errors.Annotate(err, "backend post process failed")
+			}
+		}
+	}
 
 	localChecksum := verify.NewKVGroupChecksumForAdd()
 	for id, cksum := range subtaskMeta.Checksum {
