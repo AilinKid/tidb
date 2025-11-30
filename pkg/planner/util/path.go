@@ -110,6 +110,8 @@ type AccessPath struct {
 	// Maybe added in model.IndexInfo better, but the cache of model.IndexInfo may lead side effect
 	IsUkShardIndexPath bool
 
+	FtsQueryInfo *tipb.FTSQueryInfo
+
 	// IndexLookUpPushDownBy indicates whether to use index lookup push down optimization and where it is from.
 	IndexLookUpPushDownBy IndexLookUpPushDownByType
 
@@ -137,12 +139,6 @@ type AccessPath struct {
 	//     so PartIdxCondNotAlwaysValid is true (the index path is not always valid).
 	// We add this field to make the plan cache usable for partial indexes in these limited cases.
 	PartIdxCondNotAlwaysValid bool
-
-	FullText     bool
-	QueryColumns []*expression.Column
-	QueryJSONStr string
-
-	FtsQueryInfo *tipb.FTSQueryInfo
 }
 
 // Clone returns a deep copy of the original AccessPath.
@@ -182,9 +178,6 @@ func (path *AccessPath) Clone() *AccessPath {
 		GroupedRanges:                make([][]*ranger.Range, 0, len(path.GroupedRanges)),
 		GroupByColIdxs:               slices.Clone(path.GroupByColIdxs),
 		PartIdxCondNotAlwaysValid:    path.PartIdxCondNotAlwaysValid,
-		FullText:                     path.FullText,
-		QueryColumns:                 CloneCols(path.QueryColumns),
-		QueryJSONStr:                 path.QueryJSONStr,
 	}
 	if path.FtsQueryInfo != nil {
 		ftsQueryInfo := *path.FtsQueryInfo
@@ -470,7 +463,7 @@ func (path *AccessPath) IsUndetermined() bool {
 	if path.IsTablePath() || path.Index == nil {
 		return false
 	}
-	if path.Index.MVIndex || path.Index.HasCondition() {
+	if path.Index.MVIndex || path.Index.HasCondition() || path.Index.FullTextInfo != nil {
 		return true
 	}
 	return false

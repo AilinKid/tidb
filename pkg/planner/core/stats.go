@@ -134,6 +134,8 @@ func deriveStats4DataSource(lp base.LogicalPlan, colGroups [][]*expression.Colum
 	}
 	ds.CheckPartialIndexes()
 	// Index pruning is now done earlier in CollectPredicateColumnsPoint to avoid loading stats for pruned indexes.
+	// Cleanup the unused TiCI indexes. They are not suitable for normal reads.
+	ds.CleanUnusedTiCIIndexes()
 	// Fill index paths for all paths.
 	for _, path := range ds.AllPossibleAccessPaths {
 		if path.IsTablePath() {
