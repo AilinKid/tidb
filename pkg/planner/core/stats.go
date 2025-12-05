@@ -178,14 +178,14 @@ func fillIndexPath(ds *logicalop.DataSource, path *util.AccessPath, conds []expr
 		debugtrace.EnterContextCommon(ds.SCtx())
 		defer debugtrace.LeaveContextCommon(ds.SCtx())
 	}
-	path.Ranges = ranger.FullRange()
-	path.CountAfterAccess = float64(ds.StatisticTable.RealtimeCount)
 	path.IdxCols, path.IdxColLens, path.FullIdxCols, path.FullIdxColLens =
 		util.IndexInfo2Cols(ds.Columns, ds.Schema().Columns, path.Index)
 	if path.Index.IsTiCIIndex() {
 		path.TableFilters = slices.Clone(conds)
 		return nil
 	}
+	path.Ranges = ranger.FullRange()
+	path.CountAfterAccess = float64(ds.StatisticTable.RealtimeCount)
 	if !path.Index.Unique && !path.Index.Primary && len(path.Index.Columns) == len(path.IdxCols) {
 		handleCol := ds.GetPKIsHandleCol()
 		if handleCol != nil && !mysql.HasUnsignedFlag(handleCol.RetType.GetFlag()) {
