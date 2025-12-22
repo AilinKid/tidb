@@ -867,36 +867,29 @@ func (p *PhysicalIndexScan) TryToPassTiCITopN(topN *PhysicalTopN) {
 	if hybridSearchInfo == nil || hybridSearchInfo.Sort == nil {
 		return
 	}
-
-	orderMatched := true
 	orderPos := 0
-checkLoop:
 	for _, byItem := range topN.ByItems {
-		if orderPos >= len(hybridSearchInfo.Sort.Columns) || !orderMatched {
-			break
+		// All order by items should be covered by hybrid index sort columns.
+		if orderPos >= len(hybridSearchInfo.Sort.Columns) {
+			return
 		}
 		switch x := byItem.Expr.(type) {
 		case *expression.Column:
 			if byItem.Desc != !hybridSearchInfo.Sort.IsAsc[orderPos] {
-				orderMatched = false
-				break checkLoop
+				return
 			}
 			colID := p.Table.Columns[hybridSearchInfo.Sort.Columns[orderPos].Offset].ID
 			if colID != x.ID {
-				orderMatched = false
-				break checkLoop
+				return
 			}
 			orderPos++
 		case *expression.ScalarFunction:
-			orderMatched = false
-			break checkLoop
+			return
 		}
 	}
-	if orderMatched {
-		p.FtsQueryInfo.TopK = new(uint32)
-		// The passed TopN here may be the global one. We need to consider the offset.
-		*p.FtsQueryInfo.TopK = uint32(topN.Count) + uint32(topN.Offset)
-	}
+	p.FtsQueryInfo.TopK = new(uint32)
+	// The passed TopN here may be the global one. We need to consider the offset.
+	*p.FtsQueryInfo.TopK = uint32(topN.Count) + uint32(topN.Offset)
 }
 
 // Clone implements op.PhysicalPlan interface.

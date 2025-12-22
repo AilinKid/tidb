@@ -1088,6 +1088,7 @@ func (p *PhysicalTopN) Attach2Task(tasks ...base.Task) base.Task {
 		// push it to table plan.
 		var pushedDownTopN *PhysicalTopN
 		if !copTask.indexPlanFinished && p.canPushToIndexPlan(copTask.indexPlan, cols) {
+			// The pushed down TopN is calculated on TiFlash, the embedded TopN info in TiCI is built in TryToPassTiCITopN.
 			pushedDownTopN = p.getPushedDownTopN(copTask.indexPlan)
 			indexScanPlan := copTask.indexPlan
 			for len(indexScanPlan.Children()) > 0 {
@@ -1099,6 +1100,11 @@ func (p *PhysicalTopN) Attach2Task(tasks ...base.Task) base.Task {
 			}
 			copTask.indexPlan = pushedDownTopN
 		} else {
+			// TODO: Currently, we only enable TiCI to return columns of pk.
+			// But actually it can return the columns defined in inverted clause and sort clause.
+			// Before we fix the tici side's output columns, there's some TopN cannot be pushed down to TiCI index plan.
+			// So we try to add a TopN to TiCI side again here.
+			// This will be removed once we fix the TiCI side's output columns.
 			if !copTask.indexPlanFinished && copTask.indexPlan != nil {
 				indexScanPlan := copTask.indexPlan
 				for len(indexScanPlan.Children()) > 0 {
@@ -1106,7 +1112,7 @@ func (p *PhysicalTopN) Attach2Task(tasks ...base.Task) base.Task {
 				}
 				indexScan := indexScanPlan.(*PhysicalIndexScan)
 				if indexScan.StoreType == kv.TiCI {
-					indexScan.TryToPassTiCITopN(p.getPushedDownTopN(copTask.indexPlan))
+					indexScan.TryToPassTiCITopN(p)
 				}
 			}
 			// It works for both normal index scan and index merge scan.
