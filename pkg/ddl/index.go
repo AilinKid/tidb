@@ -3001,14 +3001,14 @@ func onDropIndex(jobCtx *jobContext, job *model.Job) (ver int64, _ error) {
 		}
 	case model.StateDeleteReorganization:
 		// reorganization -> absent
-		isTiFlashIndex, isFullTextIndex := false, false
+		isTiFlashIndex, isTiCIIndex := false, false
 		indexIDs := make([]int64, 0, len(allIndexInfos))
 		for _, indexInfo := range allIndexInfos {
 			if indexInfo.IsTiFlashLocalIndex() {
 				isTiFlashIndex = true
 			}
 			if indexInfo.IsTiCIIndex() {
-				isFullTextIndex = true
+				isTiCIIndex = true
 			}
 			indexInfo.State = model.StateNone
 			// Set column index flag.
@@ -3036,7 +3036,7 @@ func onDropIndex(jobCtx *jobContext, job *model.Job) (ver int64, _ error) {
 				logutil.DDLLogger().Warn("run drop tiflash index but syncing schema failed", zap.Error(err))
 			}
 		}
-		if isFullTextIndex {
+		if isTiCIIndex {
 			// Drop full text index on TiCI.
 			for _, indexID := range indexIDs {
 				if err := tici.DropFullTextIndex(jobCtx.stepCtx, jobCtx.store, tblInfo.ID, indexID); err != nil {
