@@ -4857,6 +4857,11 @@ func (e *executor) createHybridIndex(ctx sessionctx.Context, ti ast.Ident, index
 	job.Version = model.GetJobVerInUse()
 	job.Type = model.ActionAddHybridIndex
 
+	err = initJobReorgMetaFromVariables(job, ctx)
+	if err != nil {
+		return errors.Trace(err)
+	}
+
 	args := &model.ModifyIndexArgs{
 		IndexArgs: []*model.IndexArg{{
 			IndexName:               indexName,
@@ -5226,7 +5231,7 @@ func initJobReorgMetaFromVariables(job *model.Job, sctx sessionctx.Context) erro
 	}
 
 	switch job.Type {
-	case model.ActionAddIndex, model.ActionAddPrimaryKey:
+	case model.ActionAddIndex, model.ActionAddPrimaryKey, model.ActionAddHybridIndex:
 		setReorgParam()
 		err := setDistTaskParam()
 		if err != nil {

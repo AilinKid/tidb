@@ -97,7 +97,7 @@ go_test(
     embed = [":importinto"],
     flaky = True,
     race = "on",
-    shard_count = 19,
+    shard_count = 20,
     deps = [
         "//br/pkg/storage",
         "//pkg/ddl",
@@ -145,5 +145,6 @@ go_test(
         "@com_github_tikv_pd_client//opt",
         "@org_uber_go_mock//gomock",
         "@org_uber_go_zap//:zap",
+        "@org_uber_go_zap//zaptest/observer",
     ],
 )

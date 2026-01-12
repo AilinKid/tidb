@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/pingcap/failpoint"
+	ingesttestutil "github.com/pingcap/tidb/pkg/ddl/ingest/testutil"
 	"github.com/pingcap/tidb/pkg/domain"
 	"github.com/pingcap/tidb/pkg/domain/infosync"
 	"github.com/pingcap/tidb/pkg/store/mockstore"
@@ -30,15 +31,18 @@ import (
 func TestTiCISearchExplain(t *testing.T) {
 	require.NoError(t, failpoint.Enable("github.com/pingcap/tidb/pkg/domain/infosync/MockCreateTiCIndexSuccess", `return(true)`))
 	require.NoError(t, failpoint.Enable("github.com/pingcap/tidb/pkg/tici/MockCreateTiCIIndexSuccess", `return(true)`))
+	require.NoError(t, failpoint.Enable("github.com/pingcap/tidb/pkg/tici/MockFinishIndexUpload", `return(true)`))
 	defer func() {
 		err := failpoint.Disable("github.com/pingcap/tidb/pkg/domain/infosync/MockCreateTiCIndexSuccess")
 		require.NoError(t, err)
 		err = failpoint.Disable("github.com/pingcap/tidb/pkg/tici/MockCreateTiCIIndexSuccess")
 		require.NoError(t, err)
+		err = failpoint.Disable("github.com/pingcap/tidb/pkg/tici/MockFinishIndexUpload")
+		require.NoError(t, err)
 	}()
 
 	store := testkit.CreateMockStoreWithSchemaLease(t, 1*time.Second, mockstore.WithMockTiFlash(2))
-
+	defer ingesttestutil.InjectMockBackendCtx(t, store)()
 	tk := testkit.NewTestKit(t, store)
 
 	tiflash := infosync.NewMockTiFlash()
@@ -75,6 +79,9 @@ func TestTiCISearchExplain(t *testing.T) {
 		"sort": {
 			"columns": ["i", "ts", "d"],
 			"order": ["asc", "desc", "asc"]
+		},
+		"sharding_key": {
+			"columns": ["i", "ts"]
 		}
 	}'`)
 
@@ -99,13 +106,16 @@ func TestTiCISearchExplain(t *testing.T) {
 
 func TestTiCIWithIndexHintCases(t *testing.T) {
 	require.NoError(t, failpoint.Enable("github.com/pingcap/tidb/pkg/tici/MockCreateTiCIIndexSuccess", `return(true)`))
+	require.NoError(t, failpoint.Enable("github.com/pingcap/tidb/pkg/tici/MockFinishIndexUpload", `return(true)`))
 	defer func() {
 		err := failpoint.Disable("github.com/pingcap/tidb/pkg/tici/MockCreateTiCIIndexSuccess")
+		require.NoError(t, err)
+		err = failpoint.Disable("github.com/pingcap/tidb/pkg/tici/MockFinishIndexUpload")
 		require.NoError(t, err)
 	}()
 
 	store := testkit.CreateMockStoreWithSchemaLease(t, 1*time.Second, mockstore.WithMockTiFlash(2))
-
+	defer ingesttestutil.InjectMockBackendCtx(t, store)()
 	tk := testkit.NewTestKit(t, store)
 
 	tiflash := infosync.NewMockTiFlash()
@@ -130,6 +140,9 @@ func TestTiCIWithIndexHintCases(t *testing.T) {
 		"sort": {
 			"columns": ["i", "ts", "d"],
 			"order": ["asc", "desc", "asc"]
+		},
+		"sharding_key": {
+			"columns": ["i", "ts"]
 		}
 	}'`)
 	dom := domain.GetDomain(tk.Session())

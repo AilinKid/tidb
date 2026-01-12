@@ -123,11 +123,11 @@ func (sch *LitBackfillScheduler) OnNextSubtasksBatch(
 	switch nextStep {
 	case proto.BackfillStepReadIndex:
 		if tblInfo.Partition != nil {
-			return generatePartitionPlan(ctx, storeWithPD, tblInfo)
+			return generatePartitionPlan(ctx, storeWithPD, tblInfo, backfillMeta.ScanSnapshotTS)
 		}
-		return generateNonPartitionPlan(ctx, sch.d, tblInfo, job, sch.GlobalSort, len(execIDs), logger)
+		return generateNonPartitionPlan(ctx, sch.d, tblInfo, job, sch.GlobalSort, len(execIDs), backfillMeta.ScanSnapshotTS, logger)
 	case proto.BackfillStepMergeSort:
-		return generateMergePlan(ctx, taskHandle, task, len(execIDs), backfillMeta.CloudStorageURI, logger)
+		return generateMergePlan(ctx, taskHandle, task, len(execIDs), backfillMeta.CloudStorageURI, backfillMeta.ScanSnapshotTS, logger)
 	case proto.BackfillStepWriteAndIngest:
 		if sch.GlobalSort {
 			failpoint.Inject("mockWriteIngest", func() {
@@ -145,6 +145,7 @@ func (sch *LitBackfillScheduler) OnNextSubtasksBatch(
 				taskHandle,
 				task,
 				backfillMeta.CloudStorageURI,
+				backfillMeta.ScanSnapshotTS,
 				logger)
 		}
 		return nil, nil
@@ -235,6 +236,7 @@ func generatePartitionPlan(
 	ctx context.Context,
 	store kv.StorageWithPD,
 	tblInfo *model.TableInfo,
+	scanSnapshotTS uint64,
 ) (metas [][]byte, err error) {
 	defs := tblInfo.Partition.Definitions
 	physicalIDs := make([]int64, len(defs))
@@ -252,6 +254,7 @@ func generatePartitionPlan(
 		subTaskMeta := &BackfillSubTaskMeta{
 			PhysicalTableID: physicalID,
 			TS:              importTS,
+			ScanSnapshotTS:  scanSnapshotTS,
 		}
 
 		metaBytes, err := json.Marshal(subTaskMeta)
@@ -271,6 +274,7 @@ func generateNonPartitionPlan(
 	job *model.Job,
 	useCloud bool,
 	nodeCnt int,
+	scanSnapshotTS uint64,
 	logger *zap.Logger,
 ) (metas [][]byte, err error) {
 	tbl, err := getTable(d.ddlCtx.getAutoIDRequirement(), job.SchemaID, tblInfo)
@@ -338,9 +342,10 @@ func generateNonPartitionPlan(
 			}
 			batch := recordRegionMetas[i:end]
 			subTaskMeta := &BackfillSubTaskMeta{
-				RowStart: batch[0].StartKey(),
-				RowEnd:   batch[len(batch)-1].EndKey(),
-				TS:       importTS,
+				RowStart:       batch[0].StartKey(),
+				RowEnd:         batch[len(batch)-1].EndKey(),
+				TS:             importTS,
+				ScanSnapshotTS: scanSnapshotTS,
 			}
 			if i == 0 {
 				subTaskMeta.RowStart = startKey
@@ -395,6 +400,7 @@ func generateGlobalSortIngestPlan(
 	taskHandle diststorage.TaskHandle,
 	task *proto.Task,
 	cloudStorageURI string,
+	scanSnapshotTS uint64,
 	logger *zap.Logger,
 ) ([][]byte, error) {
 	var (
@@ -443,7 +449,7 @@ func generateGlobalSortIngestPlan(
 		if i < len(eleIDs) {
 			eleID = eleIDs[i]
 		}
-		newMeta, err := splitSubtaskMetaForOneKVMetaGroup(ctx, store, g, eleID, cloudStorageURI, iCnt, logger)
+		newMeta, err := splitSubtaskMetaForOneKVMetaGroup(ctx, store, g, eleID, cloudStorageURI, iCnt, scanSnapshotTS, logger)
 		if err != nil {
 			return nil, errors.Trace(err)
 		}
@@ -487,6 +493,7 @@ func splitSubtaskMetaForOneKVMetaGroup(
 	eleID int64,
 	cloudStorageURI string,
 	instanceCnt int64,
+	scanSnapshotTS uint64,
 	logger *zap.Logger,
 ) (metaArr []*BackfillSubTaskMeta, err error) {
 	if len(kvMeta.StartKey) == 0 && len(kvMeta.EndKey) == 0 {
@@ -552,6 +559,7 @@ func splitSubtaskMetaForOneKVMetaGroup(
 			RangeJobKeys:   rangeJobKeys,
 			RangeSplitKeys: regionSplitKeys,
 			TS:             importTS,
+			ScanSnapshotTS: scanSnapshotTS,
 		}
 		if eleID > 0 {
 			m.EleIDs = []int64{eleID}
@@ -571,6 +579,7 @@ func generateMergePlan(
 	task *proto.Task,
 	nodeCnt int,
 	cloudStorageURI string,
+	scanSnapshotTS uint64,
 	logger *zap.Logger,
 ) ([][]byte, error) {
 	// check data files overlaps,
@@ -635,8 +644,9 @@ func generateMergePlan(
 		}
 		for _, files := range dataFilesGroup {
 			m := &BackfillSubTaskMeta{
-				DataFiles: files,
-				EleIDs:    eleID,
+				DataFiles:      files,
+				EleIDs:         eleID,
+				ScanSnapshotTS: scanSnapshotTS,
 			}
 			metaArr = append(metaArr, m)
 		}

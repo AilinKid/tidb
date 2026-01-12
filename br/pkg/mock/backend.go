@@ -181,17 +181,17 @@ func (mr *MockBackendMockRecorder) FlushEngine(ctx, engineUUID any) *gomock.Call
 }
 
 // ImportEngine mocks base method.
-func (m *MockBackend) ImportEngine(ctx context.Context, engineUUID uuid.UUID, engineID int32, regionSplitSize, regionSplitKeys int64) error {
+func (m *MockBackend) ImportEngine(ctx context.Context, engineUUID uuid.UUID, regionSplitSize, regionSplitKeys int64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ImportEngine", ctx, engineUUID, engineID, regionSplitSize, regionSplitKeys)
+	ret := m.ctrl.Call(m, "ImportEngine", ctx, engineUUID, regionSplitSize, regionSplitKeys)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ImportEngine indicates an expected call of ImportEngine.
-func (mr *MockBackendMockRecorder) ImportEngine(ctx, engineUUID, engineID, regionSplitSize, regionSplitKeys any) *gomock.Call {
+func (mr *MockBackendMockRecorder) ImportEngine(ctx, engineUUID, regionSplitSize, regionSplitKeys any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImportEngine", reflect.TypeOf((*MockBackend)(nil).ImportEngine), ctx, engineUUID, engineID, regionSplitSize, regionSplitKeys)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImportEngine", reflect.TypeOf((*MockBackend)(nil).ImportEngine), ctx, engineUUID, regionSplitSize, regionSplitKeys)
 }
 
 // LocalWriter mocks base method.

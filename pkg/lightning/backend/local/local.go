@@ -39,6 +39,7 @@ import (
 	"github.com/pingcap/tidb/br/pkg/pdutil"
 	"github.com/pingcap/tidb/br/pkg/restore/split"
 	"github.com/pingcap/tidb/br/pkg/version"
+	tidbconfig "github.com/pingcap/tidb/pkg/config"
 	"github.com/pingcap/tidb/pkg/infoschema"
 	"github.com/pingcap/tidb/pkg/kv"
 	"github.com/pingcap/tidb/pkg/lightning/backend"
@@ -501,6 +502,16 @@ func (c *BackendConfig) SetWorkerConcurrency(concurrency int) {
 	c.WorkerConcurrency.Store(int32(concurrency))
 }
 
+type ticiWriteGroup interface {
+	CreateFileWriter(ctx context.Context) (*tici.FileWriter, error)
+	WriteHeader(ctx context.Context, fileWriter *tici.FileWriter, commitTS uint64) error
+	WritePairs(ctx context.Context, fileWriter *tici.FileWriter, pairs []*sst.Pair, count int) error
+	CloseFileWriters(ctx context.Context, fileWriter *tici.FileWriter) error
+	FinishPartitionUpload(ctx context.Context, fileWriter *tici.FileWriter, lowerBound, upperBound []byte) error
+	FinishIndexUpload(ctx context.Context) error
+	Close() error
+}
+
 // Backend is a local backend.
 type Backend struct {
 	pdCli     pd.Client
@@ -523,7 +534,9 @@ type Backend struct {
 	// This mutex is used to do some mutual exclusion work in the backend, flushKVs() in writer for now.
 	mu sync.Mutex
 
-	ticiWriteGroup *tici.DataWriterGroup // TiCI writer group
+	ticiWriteGroup     ticiWriteGroup // TiCI writer group
+	ticiWriteEngines   sync.Map
+	ticiHeaderCommitTS sync.Map
 }
 
 var _ DiskUsage = (*Backend)(nil)
@@ -833,13 +846,53 @@ func (local *Backend) PostProcess(ctx context.Context) error {
 	return nil
 }
 
+func (local *Backend) markTiCIWriteEngine(engineUUID uuid.UUID, enabled bool) {
+	if local.logger.Logger != nil {
+		local.logger.Info(
+			"mark tici write engine",
+			zap.String("engine-uuid", engineUUID.String()),
+			zap.Bool("tici-write-enabled", enabled),
+		)
+	}
+	if enabled {
+		local.ticiWriteEngines.Store(engineUUID, struct{}{})
+		return
+	}
+	local.ticiWriteEngines.Delete(engineUUID)
+}
+
+func (local *Backend) setTiCIHeaderCommitTS(engineUUID uuid.UUID, ts uint64) {
+	if ts == 0 {
+		local.ticiHeaderCommitTS.Delete(engineUUID)
+		return
+	}
+	local.ticiHeaderCommitTS.Store(engineUUID, ts)
+}
+
+func (local *Backend) isTiCIWriteEngine(engineUUID uuid.UUID) bool {
+	_, ok := local.ticiWriteEngines.Load(engineUUID)
+	return ok
+}
+
+func (local *Backend) getTiCIHeaderCommitTS(engineUUID uuid.UUID) uint64 {
+	value, ok := local.ticiHeaderCommitTS.Load(engineUUID)
+	if !ok {
+		return 0
+	}
+	return value.(uint64)
+}
+
 // OpenEngine must be called with holding mutex of Engine.
 func (local *Backend) OpenEngine(ctx context.Context, cfg *backend.EngineConfig, engineUUID uuid.UUID) error {
+	local.markTiCIWriteEngine(engineUUID, cfg.TiCIWriteEnabled)
+	local.setTiCIHeaderCommitTS(engineUUID, cfg.TiCIHeaderCommitTS)
 	return local.engineMgr.openEngine(ctx, cfg, engineUUID)
 }
 
 // CloseEngine closes backend engine by uuid.
 func (local *Backend) CloseEngine(ctx context.Context, cfg *backend.EngineConfig, engineUUID uuid.UUID) error {
+	local.markTiCIWriteEngine(engineUUID, cfg.TiCIWriteEnabled)
+	local.setTiCIHeaderCommitTS(engineUUID, cfg.TiCIHeaderCommitTS)
 	return local.engineMgr.closeEngine(ctx, cfg, engineUUID)
 }
 
@@ -1022,6 +1075,8 @@ func (local *Backend) prepareAndSendJob(
 	engine common.Engine,
 	regionSplitKeys [][]byte,
 	regionSplitSize, regionSplitKeyCnt int64,
+	ticiWriteEnabled bool,
+	ticiHeaderCommitTS uint64,
 	jobToWorkerCh chan<- *regionJob,
 	jobWg *sync.WaitGroup,
 ) error {
@@ -1080,6 +1135,8 @@ func (local *Backend) prepareAndSendJob(
 		engine,
 		regionSplitSize,
 		regionSplitKeyCnt,
+		ticiWriteEnabled,
+		ticiHeaderCommitTS,
 		jobToWorkerCh,
 		jobWg,
 	)
@@ -1090,6 +1147,8 @@ func (local *Backend) generateAndSendJob(
 	ctx context.Context,
 	engine common.Engine,
 	regionSplitSize, regionSplitKeys int64,
+	ticiWriteEnabled bool,
+	ticiHeaderCommitTS uint64,
 	jobToWorkerCh chan<- *regionJob,
 	jobWg *sync.WaitGroup,
 ) error {
@@ -1120,7 +1179,7 @@ func (local *Backend) generateAndSendJob(
 						jobToWorkerCh <- &regionJob{}
 						time.Sleep(5 * time.Second)
 					})
-					jobs, err := local.generateJobForRange(egCtx, p.Data, p.SortedRanges, regionSplitSize, regionSplitKeys)
+					jobs, err := local.generateJobForRange(egCtx, p.Data, p.SortedRanges, regionSplitSize, regionSplitKeys, ticiWriteEnabled, ticiHeaderCommitTS)
 					if err != nil {
 						if common.IsContextCanceledError(err) {
 							return nil
@@ -1176,6 +1235,8 @@ func (local *Backend) generateJobForRange(
 	data common.IngestData,
 	sortedJobRanges []common.Range,
 	regionSplitSize, regionSplitKeys int64,
+	ticiWriteEnabled bool,
+	ticiHeaderCommitTS uint64,
 ) ([]*regionJob, error) {
 	startOfAllRanges, endOfAllRanges := sortedJobRanges[0].Start, sortedJobRanges[len(sortedJobRanges)-1].End
 
@@ -1222,7 +1283,7 @@ func (local *Backend) generateJobForRange(
 		return nil, err
 	}
 
-	jobs := newRegionJobs(regions, data, sortedJobRanges, regionSplitSize, regionSplitKeys, local.metrics)
+	jobs := newRegionJobs(regions, data, sortedJobRanges, regionSplitSize, regionSplitKeys, local.metrics, ticiWriteEnabled, ticiHeaderCommitTS)
 	log.FromContext(ctx).Info("generate region jobs",
 		zap.Int("len(jobs)", len(jobs)),
 		zap.String("startOfAllRanges", hex.EncodeToString(startOfAllRanges)),
@@ -1294,7 +1355,7 @@ func (local *Backend) executeJob(
 		failpoint.Return(
 			errors.New("the remaining storage capacity of TiKV is less than 10%%; please increase the storage capacity of TiKV and try again"))
 	})
-	if local.ShouldCheckTiKV {
+	if local.ShouldCheckTiKV && !job.ticiWriteEnabled {
 		for _, peer := range job.region.Region.GetPeers() {
 			store, err := local.pdHTTPCli.GetStore(ctx, peer.StoreId)
 			if err != nil {
@@ -1397,7 +1458,6 @@ func (local *Backend) GetExternalEngine(engineUUID uuid.UUID) *external.Engine {
 func (local *Backend) ImportEngine(
 	ctx context.Context,
 	engineUUID uuid.UUID,
-	engineID int32,
 	regionSplitSize, regionSplitKeys int64,
 ) error {
 	kvRegionSplitSize, kvRegionSplitKeys, err := GetRegionSplitSizeKeys(ctx, local.pdCli, local.tls)
@@ -1427,9 +1487,7 @@ func (local *Backend) ImportEngine(
 		e = localEngine
 	}
 
-	if local.ticiWriteGroup != nil {
-		tici.SetTiCIDataWriterGroupWritable(ctx, local.ticiWriteGroup, engineUUID, engineID)
-	}
+	ticiWriteEnabled := local.ticiWriteGroup != nil && local.isTiCIWriteEngine(engineUUID)
 
 	lfTotalSize, lfLength := e.KVStatistics()
 	if lfTotalSize == 0 {
@@ -1446,7 +1504,7 @@ func (local *Backend) ImportEngine(
 	intest.Assert(len(splitKeys) > 0)
 	startKey, endKey := splitKeys[0], splitKeys[len(splitKeys)-1]
 
-	if len(startKey) > 0 && len(endKey) > 0 {
+	if !ticiWriteEnabled && len(startKey) > 0 && len(endKey) > 0 {
 		log.FromContext(ctx).Info("force table split range",
 			zap.String("startKey", redact.Key(startKey)),
 			zap.String("endKey", redact.Key(endKey)))
@@ -1458,7 +1516,7 @@ func (local *Backend) ImportEngine(
 		defer removeTableSplitRange()
 	}
 
-	if local.PausePDSchedulerScope == config.PausePDSchedulerScopeTable {
+	if !ticiWriteEnabled && local.PausePDSchedulerScope == config.PausePDSchedulerScopeTable {
 		log.FromContext(ctx).Info("pause pd scheduler of table scope")
 		subCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
@@ -1480,7 +1538,7 @@ func (local *Backend) ImportEngine(
 		}()
 	}
 
-	if local.BackendConfig.RaftKV2SwitchModeDuration > 0 {
+	if !ticiWriteEnabled && local.BackendConfig.RaftKV2SwitchModeDuration > 0 {
 		log.FromContext(ctx).Info("switch import mode of ranges",
 			zap.String("startKey", redact.Key(startKey)),
 			zap.String("endKey", redact.Key(endKey)))
@@ -1511,7 +1569,8 @@ func (local *Backend) ImportEngine(
 
 	failpoint.InjectCall("ReadyForImportEngine")
 
-	err = local.doImport(ctx, e, splitKeys, regionSplitSize, regionSplitKeys)
+	ticiHeaderCommitTS := local.getTiCIHeaderCommitTS(engineUUID)
+	err = local.doImport(ctx, e, splitKeys, regionSplitSize, regionSplitKeys, ticiWriteEnabled, ticiHeaderCommitTS)
 	if err == nil {
 		importedSize, importedLength := e.ImportedStatistics()
 
@@ -1540,6 +1599,8 @@ func (local *Backend) doImport(
 	engine common.Engine,
 	regionSplitKeys [][]byte,
 	regionSplitSize, regionSplitKeyCnt int64,
+	ticiWriteEnabled bool,
+	ticiHeaderCommitTS uint64,
 ) error {
 	/*
 	 ┌─────────────────┐                   ┌─────────────┐   ┌────────────┐
@@ -1718,6 +1779,8 @@ func (local *Backend) doImport(
 			regionSplitKeys,
 			regionSplitSize,
 			regionSplitKeyCnt,
+			ticiWriteEnabled,
+			ticiHeaderCommitTS,
 			jobToWorkerCh,
 			&jobWg,
 		)
@@ -2019,6 +2082,23 @@ func GetRegionSplitSizeKeys(ctx context.Context, cli pd.Client, tls *common.TLS)
 // InitTiCIWriterGroup initializes the ticiWriteGroup field for the Backend using the given table info and schema
 // in the TiDB instance level. The `taskID` is a unique identifier for this Job.
 func (local *Backend) InitTiCIWriterGroup(ctx context.Context, getEtcdClient func() (*etcd.Client, error), tblInfo *model.TableInfo, schema string, taskID string) error {
+	if getEtcdClient == nil {
+		getEtcdClient = func() (*etcd.Client, error) {
+			tidbCfg := tidbconfig.GetGlobalConfig()
+			tls, err := util.NewTLSConfig(
+				util.WithCAPath(tidbCfg.Security.ClusterSSLCA),
+				util.WithCertAndKeyPath(tidbCfg.Security.ClusterSSLCert, tidbCfg.Security.ClusterSSLKey),
+			)
+			if err != nil {
+				return nil, err
+			}
+			endpoints, err := util.ParseHostPortAddr(tidbCfg.Path)
+			if err != nil {
+				return nil, err
+			}
+			return etcd.NewClientFromCfg(endpoints, 5*time.Second, "", tls)
+		}
+	}
 	keyspaceID := uint32(local.tikvCodec.GetKeyspaceID())
 	ticiWriteGroup, err := tici.NewTiCIDataWriterGroup(ctx, getEtcdClient, tblInfo, schema, taskID, keyspaceID)
 	if err != nil {

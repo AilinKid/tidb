@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	goerrors "errors"
+	"strconv"
 	"sync/atomic"
 
 	"github.com/pingcap/errors"
@@ -87,6 +88,15 @@ func (m *cloudImportExecutor) Init(ctx context.Context) error {
 	}
 	m.backend = bd
 	m.backendCtx = bCtx
+	for _, idx := range m.indexes {
+		if idx.IsTiCIIndex() {
+			taskID := strconv.FormatInt(m.job.ID, 10)
+			if err := bd.InitTiCIWriterGroup(ctx, nil, m.ptbl.Meta(), m.job.SchemaName, taskID); err != nil {
+				return err
+			}
+			break
+		}
+	}
 	return nil
 }
 
@@ -109,7 +119,11 @@ func (m *cloudImportExecutor) RunSubtask(ctx context.Context, subtask *proto.Sub
 	}
 
 	_, engineUUID := backend.MakeUUID(m.ptbl.Meta().Name.L, idxID)
-	engineID := int32(common.IndexEngineID)
+
+	ticiHeaderCommitTS := uint64(0)
+	if currentIdx != nil && currentIdx.HybridInfo != nil {
+		ticiHeaderCommitTS = sm.ScanSnapshotTS
+	}
 
 	all := external.SortedKVMeta{}
 	for _, g := range sm.MetaGroups {
@@ -122,6 +136,8 @@ func (m *cloudImportExecutor) RunSubtask(ctx context.Context, subtask *proto.Sub
 		jobKeys = sm.RangeSplitKeys
 	}
 	err = local.CloseEngine(ctx, &backend.EngineConfig{
+		TiCIWriteEnabled:   currentIdx != nil && currentIdx.IsTiCIIndex(),
+		TiCIHeaderCommitTS: ticiHeaderCommitTS,
 		External: &backend.ExternalEngineConfig{
 			StorageURI:    m.cloudStoreURI,
 			DataFiles:     sm.DataFiles,
@@ -148,7 +164,7 @@ func (m *cloudImportExecutor) RunSubtask(ctx context.Context, subtask *proto.Sub
 	m.engine.Store(eng)
 	defer m.engine.Store(nil)
 
-	err = local.ImportEngine(ctx, engineUUID, engineID, int64(config.SplitRegionSize), int64(config.SplitRegionKeys))
+	err = local.ImportEngine(ctx, engineUUID, int64(config.SplitRegionSize), int64(config.SplitRegionKeys))
 	failpoint.Inject("mockCloudImportRunSubtaskError", func(_ failpoint.Value) {
 		err = context.DeadlineExceeded
 	})
