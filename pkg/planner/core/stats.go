@@ -136,12 +136,27 @@ func deriveStats4DataSource(lp base.LogicalPlan, colGroups [][]*expression.Colum
 	// Index pruning is now done earlier in CollectPredicateColumnsPoint to avoid loading stats for pruned indexes.
 	// Cleanup the unused TiCI indexes. They are not suitable for normal reads.
 	ds.CleanUnusedTiCIIndexes()
-	// Fill index paths for all paths.
+	var commonHandleInfoForTiCI *model.IndexInfo
+	firstTiCIIndex := true
+	// Fill index paths for all paths. TiCI needs the common-handle metadata
+	// to derive its shard-pruning columns and row layout.
 	for _, path := range ds.AllPossibleAccessPaths {
 		if path.IsTablePath() {
+			commonHandleInfoForTiCI = path.Index
 			continue
 		}
-		err := fillIndexPath(ds, path, ds.PushedDownConds)
+		if path.Index.IsTiCIIndex() && firstTiCIIndex {
+			firstTiCIIndex = false
+			if commonHandleInfoForTiCI == nil && ds.TableInfo.IsCommonHandle {
+				for _, index := range ds.TableInfo.Indices {
+					if index.Primary {
+						commonHandleInfoForTiCI = index
+						break
+					}
+				}
+			}
+		}
+		err := fillIndexPath(ds, path, ds.PushedDownConds, commonHandleInfoForTiCI)
 		if err != nil {
 			return nil, err
 		}
@@ -173,20 +188,22 @@ func deriveStats4DataSource(lp base.LogicalPlan, colGroups [][]*expression.Colum
 	return ds.StatsInfo(), nil
 }
 
-func fillIndexPath(ds *logicalop.DataSource, path *util.AccessPath, conds []expression.Expression) error {
+func fillIndexPath(ds *logicalop.DataSource, path *util.AccessPath, conds []expression.Expression, possiblePK *model.IndexInfo) error {
 	if ds.SCtx().GetSessionVars().StmtCtx.EnableOptimizerDebugTrace {
 		debugtrace.EnterContextCommon(ds.SCtx())
 		defer debugtrace.LeaveContextCommon(ds.SCtx())
 	}
-	path.IdxCols, path.IdxColLens, path.FullIdxCols, path.FullIdxColLens =
-		util.IndexInfo2Cols(ds.Columns, ds.Schema().Columns, path.Index)
-	if path.Index.IsTiCIIndex() {
-		path.TableFilters = slices.Clone(conds)
-		return nil
+	isTiCIIndex := path.Index.IsTiCIIndex()
+	if isTiCIIndex {
+		path.IdxCols, path.IdxColLens = util.TiCIIndexInfo2ShardCols(ds.Columns, ds.Schema().Columns, path.Index, possiblePK)
+		path.FullIdxCols, path.FullIdxColLens = util.IndexInfo2FullCols(ds.Columns, ds.Schema().Columns, path.Index)
+	} else {
+		path.IdxCols, path.IdxColLens, path.FullIdxCols, path.FullIdxColLens =
+			util.IndexInfo2Cols(ds.Columns, ds.Schema().Columns, path.Index)
 	}
 	path.Ranges = ranger.FullRange()
 	path.CountAfterAccess = float64(ds.StatisticTable.RealtimeCount)
-	if !path.Index.Unique && !path.Index.Primary && len(path.Index.Columns) == len(path.IdxCols) {
+	if !path.Index.Unique && !path.Index.Primary && len(path.Index.Columns) == len(path.IdxCols) && !isTiCIIndex {
 		handleCol := ds.GetPKIsHandleCol()
 		if handleCol != nil && !mysql.HasUnsignedFlag(handleCol.RetType.GetFlag()) {
 			alreadyHandle := false
@@ -208,7 +225,7 @@ func fillIndexPath(ds *logicalop.DataSource, path *util.AccessPath, conds []expr
 			}
 		}
 	}
-	err := detachCondAndBuildRangeForPath(ds.SCtx(), path, conds, ds.TableStats.HistColl)
+	err := detachCondAndBuildRangeForPath(ds.SCtx(), path, conds, ds.TableStats.HistColl, isTiCIIndex)
 	return err
 }
 
@@ -217,6 +234,7 @@ func deriveSearchPathStats(ds *logicalop.DataSource, path *util.AccessPath) {
 		debugtrace.EnterContextCommon(ds.SCtx())
 		defer debugtrace.LeaveContextCommon(ds.SCtx())
 	}
+	path.IndexFilters, path.TableFilters = splitIndexFilterConditions(ds, path.TableFilters, path.FullIdxCols, path.FullIdxColLens)
 	path.CountAfterAccess = min(float64(ds.StatisticTable.RealtimeCount)/10, 1000)
 }
 
@@ -367,7 +385,7 @@ func deriveCommonHandleTablePathStats(ds *logicalop.DataSource, path *util.Acces
 	if len(conds) == 0 {
 		return nil
 	}
-	if err := detachCondAndBuildRangeForPath(ds.SCtx(), path, conds, ds.TableStats.HistColl); err != nil {
+	if err := detachCondAndBuildRangeForPath(ds.SCtx(), path, conds, ds.TableStats.HistColl, false); err != nil {
 		return err
 	}
 	if path.EqOrInCondCount == len(path.AccessConds) {
@@ -403,9 +421,12 @@ func detachCondAndBuildRangeForPath(
 	path *util.AccessPath,
 	conds []expression.Expression,
 	histColl *statistics.HistColl,
+	isTiCIIndex bool,
 ) error {
 	if len(path.IdxCols) == 0 {
-		path.TableFilters = conds
+		if !isTiCIIndex {
+			path.TableFilters = conds
+		}
 		return nil
 	}
 	res, err := ranger.DetachCondAndBuildRangeForIndex(sctx.GetRangerCtx(), conds, path.IdxCols, path.IdxColLens, sctx.GetSessionVars().RangeMaxSize)
@@ -413,6 +434,9 @@ func detachCondAndBuildRangeForPath(
 		return err
 	}
 	path.Ranges = res.Ranges
+	if isTiCIIndex {
+		return nil
+	}
 	path.AccessConds = res.AccessConds
 	path.TableFilters = res.RemainedConds
 	path.EqCondCount = res.EqCondCount
@@ -616,7 +640,7 @@ func derivePathStatsAndTryHeuristics(ds *logicalop.DataSource) error {
 			path.IsSingleScan = true
 		} else if path.FtsQueryInfo != nil {
 			deriveSearchPathStats(ds, path)
-			path.IsSingleScan = isTiCISingleScan(ds)
+			path.IsSingleScan = isTiCISingleScan(ds, path.FullIdxCols, path.FullIdxColLens, path)
 		} else {
 			deriveIndexPathStats(ds, path, ds.PushedDownConds, false)
 			// Reevaluate path.IsSingleScan because it may have been set incorrectly
@@ -694,6 +718,18 @@ func derivePathStatsAndTryHeuristics(ds *logicalop.DataSource) error {
 	// heuristic rule pruning other path should consider hint prefer.
 	// If no hints and some path matches a heuristic rule, just remove other possible paths.
 	if selected != nil {
+		selectedMatched := false
+		for _, path := range ds.PossibleAccessPaths {
+			if path == selected {
+				selectedMatched = true
+				break
+			}
+		}
+		// Some paths may have been pruned earlier because an FTS function forces
+		// a TiCI path. Do not let a removed heuristic candidate prune that path.
+		if !selectedMatched {
+			return nil
+		}
 		// heuristic rule pruning only affect current DS's PossibleAccessPaths, where physical plan will be generated.
 		ds.PossibleAccessPaths[0] = selected
 		ds.PossibleAccessPaths = ds.PossibleAccessPaths[:1]

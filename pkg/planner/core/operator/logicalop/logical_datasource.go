@@ -47,7 +47,6 @@ import (
 	h "github.com/pingcap/tidb/pkg/util/hint"
 	"github.com/pingcap/tidb/pkg/util/intset"
 	"github.com/pingcap/tidb/pkg/util/plancodec"
-	"github.com/pingcap/tidb/pkg/util/ranger"
 	"github.com/pingcap/tipb/go-tipb"
 )
 
@@ -259,7 +258,7 @@ func (ds *DataSource) PredicatePushDown(predicates []expression.Expression, opt 
 func (ds *DataSource) PruneColumns(parentUsedCols []*expression.Column, opt *optimizetrace.LogicalOptimizeOp) (base.LogicalPlan, error) {
 	used := expression.GetUsedList(ds.SCtx().GetExprCtx().GetEvalCtx(), parentUsedCols, ds.Schema())
 
-	exprCols := expression.ExtractColumnsFromExpressions(nil, ds.AllConds, nil)
+	exprCols := expression.ExtractColumnsFromExpressionsIgnoringFTS(nil, ds.AllConds, nil)
 	exprUsed := expression.GetUsedList(ds.SCtx().GetExprCtx().GetEvalCtx(), exprCols, ds.Schema())
 	prunedColumns := make([]*expression.Column, 0)
 
@@ -945,12 +944,10 @@ func (ds *DataSource) buildTiCIFTSPathAndCleanUp(
 		ds.SCtx().GetSessionVars().StmtCtx.AppendWarning(plannererrors.ErrWarnConflictingHint.FastGenByArgs("USE_INDEX"))
 	}
 
-	if err := ds.preparePKRangesForTiCI(ds.PossibleAccessPaths[0], ds.PushedDownConds); err != nil {
-		return err
-	}
-
-	// Remove the matched conditions from PushedDownConds.
-	ds.PushedDownConds = slices.DeleteFunc(ds.PushedDownConds, func(cond expression.Expression) bool {
+	remainedFilters := slices.Clone(ds.PushedDownConds)
+	// The search functions are handled by TiCI; keep the remaining predicates
+	// as filters without mutating DataSource conditions used by later phases.
+	remainedFilters = slices.DeleteFunc(remainedFilters, func(cond expression.Expression) bool {
 		sf, ok := cond.(*expression.ScalarFunction)
 		if !ok {
 			return false
@@ -958,9 +955,6 @@ func (ds *DataSource) buildTiCIFTSPathAndCleanUp(
 		_, ok = matchedFuncs[sf]
 		return ok
 	})
-	// Re-construct AllConds because column pruning relies on it.
-	ds.AllConds = slices.Clone(ds.PushedDownConds)
-
 	evalCtx := ds.SCtx().GetExprCtx().GetEvalCtx()
 	client := ds.SCtx().GetBuildPBCtx().Client
 	pbConverter := expression.NewPBConverterForTiCI(client, evalCtx)
@@ -990,87 +984,7 @@ func (ds *DataSource) buildTiCIFTSPathAndCleanUp(
 	for ftsFunc := range matchedFuncs {
 		ds.PossibleAccessPaths[0].AccessConds = append(ds.PossibleAccessPaths[0].AccessConds, ftsFunc)
 	}
-	return nil
-}
-
-// preparePKRangesForTiCI prepares the pk ranges for TiCI index scan.
-// It's a tmp solution.
-// We should make it reusing the logic of building pk ranges for normal table scan.
-func (ds *DataSource) preparePKRangesForTiCI(ticiPath *util.AccessPath, pushedPredicates []expression.Expression) error {
-	if ds.TableInfo.IsCommonHandle {
-		ticiPath.Ranges = ranger.FullNotNullRange()
-		var commonHandle *model.IndexInfo
-		for _, idx := range ds.TableInfo.Indices {
-			if idx.Primary {
-				commonHandle = idx
-				break
-			}
-		}
-		ticiPath.IdxCols, ticiPath.IdxColLens, ticiPath.FullIdxCols, ticiPath.FullIdxColLens =
-			util.IndexInfo2Cols(ds.Columns, ds.Schema().Columns, commonHandle)
-		if len(pushedPredicates) == 0 {
-			return nil
-		}
-		if err := detachCondAndBuildRangeForPath(ds.SCtx(), ticiPath, pushedPredicates); err != nil {
-			return err
-		}
-		ticiPath.IdxCols = ticiPath.IdxCols[:0]
-		ticiPath.IdxColLens = ticiPath.IdxColLens[:0]
-		ticiPath.FullIdxCols = ticiPath.FullIdxCols[:0]
-		ticiPath.FullIdxColLens = ticiPath.FullIdxColLens[:0]
-		return nil
-	}
-
-	var pkCol *expression.Column
-	isUnsigned := false
-	if ds.TableInfo.PKIsHandle {
-		if pkColInfo := ds.TableInfo.GetPkColInfo(); pkColInfo != nil {
-			isUnsigned = mysql.HasUnsignedFlag(pkColInfo.GetFlag())
-			pkCol = expression.ColInfo2Col(ds.Schema().Columns, pkColInfo)
-		}
-	} else {
-		pkCol = ds.Schema().GetExtraHandleColumn()
-	}
-	if pkCol == nil {
-		ticiPath.Ranges = ranger.FullIntRange(isUnsigned)
-		return nil
-	}
-
-	ticiPath.Ranges = ranger.FullIntRange(isUnsigned)
-	if len(pushedPredicates) == 0 {
-		return nil
-	}
-	ticiPath.AccessConds, _ = ranger.DetachCondsForColumn(ds.SCtx().GetRangerCtx(), pushedPredicates, pkCol)
-	var err error
-	ticiPath.Ranges, ticiPath.AccessConds, _, err = ranger.BuildTableRange(
-		ticiPath.AccessConds,
-		ds.SCtx().GetRangerCtx(),
-		pkCol.RetType,
-		ds.SCtx().GetSessionVars().RangeMaxSize,
-	)
-	return err
-}
-
-func detachCondAndBuildRangeForPath(
-	sctx base.PlanContext,
-	path *util.AccessPath,
-	conds []expression.Expression,
-) error {
-	if len(path.IdxCols) == 0 {
-		return nil
-	}
-	res, err := ranger.DetachCondAndBuildRangeForIndex(
-		sctx.GetRangerCtx(),
-		conds,
-		path.IdxCols,
-		path.IdxColLens,
-		sctx.GetSessionVars().RangeMaxSize,
-	)
-	if err != nil {
-		return err
-	}
-	path.Ranges = res.Ranges
-	path.AccessConds = res.AccessConds
+	ds.PossibleAccessPaths[0].TableFilters = remainedFilters
 	return nil
 }
 

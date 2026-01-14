@@ -191,6 +191,32 @@ func ExtractColumnsFromExpressions(result []*Column, exprs []Expression, filter 
 	return result
 }
 
+// ExtractColumnsFromExpressionsIgnoringFTS extracts columns while skipping the
+// arguments of FTS functions, which are evaluated by the TiCI index library.
+func ExtractColumnsFromExpressionsIgnoringFTS(result []*Column, exprs []Expression, filter func(*Column) bool) []*Column {
+	for _, expr := range exprs {
+		result = extractColumnsIgnoringFTS(result, expr, filter)
+	}
+	return result
+}
+
+func extractColumnsIgnoringFTS(result []*Column, expr Expression, filter func(*Column) bool) []*Column {
+	switch v := expr.(type) {
+	case *Column:
+		if filter == nil || filter(v) {
+			result = append(result, v)
+		}
+	case *ScalarFunction:
+		if _, ok := FTSFuncMap[v.FuncName.L]; ok {
+			return result
+		}
+		for _, arg := range v.GetArgs() {
+			result = extractColumnsIgnoringFTS(result, arg, filter)
+		}
+	}
+	return result
+}
+
 func extractColumns(result []*Column, expr Expression, filter func(*Column) bool) []*Column {
 	switch v := expr.(type) {
 	case *Column:

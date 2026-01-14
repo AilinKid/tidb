@@ -560,6 +560,12 @@ func (index *IndexInfo) IsTiCIIndex() bool {
 	return index.FullTextInfo != nil || index.HybridInfo != nil
 }
 
+// HasExtraTiCIShardingKey checks whether the TiCI index uses an explicit
+// sharding key, whose storage key has the normal index-key layout.
+func (index *IndexInfo) HasExtraTiCIShardingKey() bool {
+	return index.HybridInfo != nil && index.HybridInfo.Sharding != nil
+}
+
 // HasCondition checks whether the index has a partial index condition.
 func (index *IndexInfo) HasCondition() bool {
 	return len(index.ConditionExprString) > 0

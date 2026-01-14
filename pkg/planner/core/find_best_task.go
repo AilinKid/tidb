@@ -2529,29 +2529,16 @@ func isSingleScan(lp base.LogicalPlan, indexColumns []*expression.Column, idxCol
 	return true
 }
 
-func isHandleCoveringColumns(ds *logicalop.DataSource, columns []*expression.Column) bool {
-	evalCtx := ds.SCtx().GetExprCtx().GetEvalCtx()
-	for _, col := range columns {
-		if ds.TableInfo.PKIsHandle && mysql.HasPriKeyFlag(col.RetType.GetFlag()) {
-			continue
-		}
-		if col.ID == model.ExtraHandleID || col.ID == model.ExtraPhysTblID {
-			continue
-		}
-		if isIndexColsCoveringCol(evalCtx, col, ds.CommonHandleCols, ds.CommonHandleLens, false) {
-			continue
-		}
+func isTiCISingleScan(ds *logicalop.DataSource, indexColumns []*expression.Column, idxColLens []int, path *util.AccessPath) bool {
+	if !isIndexCoveringColumns(ds, ds.ColsRequiringFullLen, indexColumns, idxColLens) {
 		return false
+	}
+	for _, cond := range path.TableFilters {
+		if !isIndexCoveringCondition(ds, cond, indexColumns, idxColLens) {
+			return false
+		}
 	}
 	return true
-}
-
-func isTiCISingleScan(ds *logicalop.DataSource) bool {
-	// No residual filter can be calculated in TiCI.
-	if len(ds.PushedDownConds) > 0 {
-		return false
-	}
-	return isHandleCoveringColumns(ds, ds.Schema().Columns)
 }
 
 // If there is a table reader which needs to keep order, we should append a pk to table scan.
@@ -2816,26 +2803,32 @@ func (is *PhysicalIndexScan) initSchemaForTiKVIndex(idxExprCols []*expression.Co
 
 // initSchemaForTiCIIndex is used to set the schema of PhysicalIndexScan.
 // Unlike the normal TiKV index, the indexed columns in TiCI index may not store its original data.
-// Currently, only primary key can return from the index library.
-func (is *PhysicalIndexScan) initSchemaForTiCIIndex(possibleHandleCols []*expression.Column) {
+// TiCI returns primary-key columns followed by deduplicated index columns.
+func (is *PhysicalIndexScan) initSchemaForTiCIIndex(possibleHandleCols, indexCols []*expression.Column) {
 	intest.Assert(!is.Index.Global && !is.Index.MVIndex)
 	handleLen := 1
 	if is.Table.IsCommonHandle {
 		handleLen = len(possibleHandleCols)
 	}
-	handleCols := make([]*expression.Column, 0, handleLen)
-	handleCols = append(handleCols, possibleHandleCols...)
-	if len(handleCols) == 0 {
+	rowLen := handleLen
+	for _, col := range indexCols {
+		if col != nil {
+			rowLen++
+		}
+	}
+	rowLayout := make([]*expression.Column, 0, rowLen)
+	rowLayout = append(rowLayout, possibleHandleCols...)
+	if len(rowLayout) == 0 {
 		foundIntPK := false
 		for i, col := range is.Columns {
 			if (mysql.HasPriKeyFlag(col.GetFlag()) && is.Table.PKIsHandle) || col.ID == model.ExtraHandleID {
-				handleCols = append(handleCols, is.dataSourceSchema.Columns[i])
+				rowLayout = append(rowLayout, is.dataSourceSchema.Columns[i])
 				foundIntPK = true
 				break
 			}
 		}
 		if !foundIntPK {
-			handleCols = append(handleCols, &expression.Column{
+			rowLayout = append(rowLayout, &expression.Column{
 				RetType:  types.NewFieldType(mysql.TypeLonglong),
 				ID:       model.ExtraHandleID,
 				UniqueID: is.SCtx().GetSessionVars().AllocPlanColumnID(),
@@ -2843,7 +2836,20 @@ func (is *PhysicalIndexScan) initSchemaForTiCIIndex(possibleHandleCols []*expres
 			})
 		}
 	}
-	is.SetSchema(expression.NewSchema(handleCols...))
+	columnIDs := make(map[int64]struct{}, len(rowLayout))
+	for _, col := range rowLayout {
+		columnIDs[col.ID] = struct{}{}
+	}
+	for _, col := range indexCols {
+		if col == nil {
+			continue
+		}
+		if _, exists := columnIDs[col.ID]; !exists {
+			rowLayout = append(rowLayout, col)
+			columnIDs[col.ID] = struct{}{}
+		}
+	}
+	is.SetSchema(expression.NewSchema(rowLayout...))
 }
 
 func (is *PhysicalIndexScan) addSelectionConditionForGlobalIndex(p *logicalop.DataSource, physPlanPartInfo *PhysPlanPartInfo, conditions []expression.Expression) ([]expression.Expression, error) {
@@ -3565,7 +3571,7 @@ func getOriginalPhysicalIndexScan(ds *logicalop.DataSource, prop *property.Physi
 	}
 	rowCount := path.CountAfterAccess
 	if is.FtsQueryInfo != nil {
-		is.initSchemaForTiCIIndex(ds.CommonHandleCols)
+		is.initSchemaForTiCIIndex(ds.CommonHandleCols, path.FullIdxCols)
 	} else {
 		is.initSchemaForTiKVIndex(append(path.FullIdxCols, ds.CommonHandleCols...), !isSingleScan)
 	}

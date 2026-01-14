@@ -346,7 +346,7 @@ func (e *IndexReaderExecutor) buildKVRangesForIndexReader() ([]kv.KeyRange, erro
 
 	results := make([]kv.KeyRange, 0, len(groupedRanges))
 	for _, ranges := range groupedRanges {
-		kvRanges, err := buildKeyRanges(e.dctx, ranges, e.partRangeMap, tableIDs, e.index.ID, e.index.IsTiCIIndex(), e.table.Meta().IsCommonHandle, nil)
+		kvRanges, err := buildKeyRanges(e.dctx, ranges, e.partRangeMap, tableIDs, e.index, e.table.Meta().IsCommonHandle, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -377,11 +377,6 @@ func (e *IndexReaderExecutor) buildKVReq(r []kv.KeyRange) (*kv.Request, error) {
 		builder.FullTextInfo.TableID = e.table.Meta().ID
 		builder.FullTextInfo.IndexID = e.index.ID
 		builder.FullTextInfo.ExecutorID = e.plans[0].ExplainID().String()
-
-		id := e.Table().Meta().ID
-		startKey := tablecodec.EncodeTablePrefix(id)
-		endKey := tablecodec.EncodeTablePrefix(id + 1)
-		builder.SetKeyRanges([]kv.KeyRange{{StartKey: startKey, EndKey: endKey}})
 	}
 	kvReq, err := builder.Build()
 	return kvReq, err
@@ -653,31 +648,40 @@ func buildKeyRanges(dctx *distsqlctx.DistSQLContext,
 	ranges []*ranger.Range,
 	rangeOverrideForPartitionID map[int64][]*ranger.Range,
 	physicalIDs []int64,
-	indexID int64,
-	isFulltext bool,
+	index *model.IndexInfo,
 	tableIsCommonHandle bool,
 	memTracker *memory.Tracker,
 ) ([][]kv.KeyRange, error) {
 	results := make([][]kv.KeyRange, 0, len(physicalIDs))
+	var ticiShardType distsql.TiCIShardType
+	if index.IsTiCIIndex() {
+		if index.HasExtraTiCIShardingKey() {
+			ticiShardType = distsql.TiCIShardExtraShardingKey
+		} else if tableIsCommonHandle {
+			ticiShardType = distsql.TiCIShardCommonHandle
+		} else {
+			ticiShardType = distsql.TiCIShardIntHandle
+		}
+	}
 	for _, physicalID := range physicalIDs {
 		curRanges := ranges
 		if pRange, ok := rangeOverrideForPartitionID[physicalID]; ok {
 			curRanges = pRange
 		}
-		if isFulltext {
-			rRanges, err := distsql.FulltextIndexRangesToKVRanges(dctx, []int64{physicalID}, curRanges, tableIsCommonHandle)
+		if index.IsTiCIIndex() {
+			rRanges, err := distsql.TiCIIndexRangesToKVRanges(dctx, []int64{physicalID}, index.ID, curRanges, ticiShardType)
 			if err != nil {
 				return nil, err
 			}
 			results = append(results, rRanges.FirstPartitionRange())
-		} else if indexID == -1 {
+		} else if index.ID == -1 {
 			rRanges, err := distsql.CommonHandleRangesToKVRanges(dctx, []int64{physicalID}, curRanges)
 			if err != nil {
 				return nil, err
 			}
 			results = append(results, rRanges.FirstPartitionRange())
 		} else {
-			singleRanges, err := distsql.IndexRangesToKVRangesWithInterruptSignal(dctx, physicalID, indexID, curRanges, memTracker, nil)
+			singleRanges, err := distsql.IndexRangesToKVRangesWithInterruptSignal(dctx, physicalID, index.ID, curRanges, memTracker, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -705,7 +709,7 @@ func (e *IndexLookUpExecutor) buildTableKeyRanges() (err error) {
 	kvRanges := make([][]kv.KeyRange, 0, len(groupedRanges))
 	physicalTblIDsForPartitionKVRanges := make([]int64, 0, len(tableIDs)*len(groupedRanges))
 	for _, ranges := range groupedRanges {
-		kvRange, err := buildKeyRanges(e.dctx, ranges, e.partitionRangeMap, tableIDs, e.index.ID, e.index.IsTiCIIndex(), e.table.Meta().IsCommonHandle, e.memTracker)
+		kvRange, err := buildKeyRanges(e.dctx, ranges, e.partitionRangeMap, tableIDs, e.index, e.table.Meta().IsCommonHandle, e.memTracker)
 		if err != nil {
 			return err
 		}

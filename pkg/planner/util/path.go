@@ -44,7 +44,11 @@ const (
 // AccessPath indicates the way we access a table: by using single index, or by using multiple indexes,
 // or just by using table scan.
 type AccessPath struct {
-	Index          *model.IndexInfo
+	Index *model.IndexInfo
+	// For row indexes, FullIdxCols contains every index column and IdxCols is
+	// the access-condition prefix. For TiCI indexes, FullIdxCols contains the
+	// columns returned by the index (excluding separately handled PK columns),
+	// while IdxCols contains the columns used for shard pruning.
 	FullIdxCols    []*expression.Column
 	FullIdxColLens []int
 	IdxCols        []*expression.Column
