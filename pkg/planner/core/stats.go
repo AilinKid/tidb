@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/pingcap/errors"
+	"github.com/pingcap/tidb/pkg/distsql"
 	"github.com/pingcap/tidb/pkg/domain"
 	"github.com/pingcap/tidb/pkg/expression"
 	"github.com/pingcap/tidb/pkg/infoschema"
@@ -193,8 +194,15 @@ func fillIndexPath(ds *logicalop.DataSource, path *util.AccessPath, conds []expr
 		debugtrace.EnterContextCommon(ds.SCtx())
 		defer debugtrace.LeaveContextCommon(ds.SCtx())
 	}
-	isTiCIIndex := path.Index.IsTiCIIndex()
-	if isTiCIIndex {
+	ticiType := distsql.NotTiCIIndex
+	if path.Index.IsTiCIIndex() {
+		if path.Index.HasExtraTiCIShardingKey() {
+			ticiType = distsql.TiCIShardExtraShardingKey
+		} else if ds.TableInfo.IsCommonHandle {
+			ticiType = distsql.TiCIShardCommonHandle
+		} else {
+			ticiType = distsql.TiCIShardIntHandle
+		}
 		path.IdxCols, path.IdxColLens = util.TiCIIndexInfo2ShardCols(ds.Columns, ds.Schema().Columns, path.Index, possiblePK)
 		path.FullIdxCols, path.FullIdxColLens = util.IndexInfo2FullCols(ds.Columns, ds.Schema().Columns, path.Index)
 	} else {
@@ -203,7 +211,7 @@ func fillIndexPath(ds *logicalop.DataSource, path *util.AccessPath, conds []expr
 	}
 	path.Ranges = ranger.FullRange()
 	path.CountAfterAccess = float64(ds.StatisticTable.RealtimeCount)
-	if !path.Index.Unique && !path.Index.Primary && len(path.Index.Columns) == len(path.IdxCols) && !isTiCIIndex {
+	if !path.Index.Unique && !path.Index.Primary && len(path.Index.Columns) == len(path.IdxCols) && ticiType == distsql.NotTiCIIndex {
 		handleCol := ds.GetPKIsHandleCol()
 		if handleCol != nil && !mysql.HasUnsignedFlag(handleCol.RetType.GetFlag()) {
 			alreadyHandle := false
@@ -225,7 +233,7 @@ func fillIndexPath(ds *logicalop.DataSource, path *util.AccessPath, conds []expr
 			}
 		}
 	}
-	err := detachCondAndBuildRangeForPath(ds.SCtx(), path, conds, ds.TableStats.HistColl, isTiCIIndex)
+	err := detachCondAndBuildRangeForPath(ds.SCtx(), path, conds, ds.TableStats.HistColl, ticiType)
 	return err
 }
 
@@ -385,7 +393,7 @@ func deriveCommonHandleTablePathStats(ds *logicalop.DataSource, path *util.Acces
 	if len(conds) == 0 {
 		return nil
 	}
-	if err := detachCondAndBuildRangeForPath(ds.SCtx(), path, conds, ds.TableStats.HistColl, false); err != nil {
+	if err := detachCondAndBuildRangeForPath(ds.SCtx(), path, conds, ds.TableStats.HistColl, distsql.NotTiCIIndex); err != nil {
 		return err
 	}
 	if path.EqOrInCondCount == len(path.AccessConds) {
@@ -421,10 +429,10 @@ func detachCondAndBuildRangeForPath(
 	path *util.AccessPath,
 	conds []expression.Expression,
 	histColl *statistics.HistColl,
-	isTiCIIndex bool,
+	ticiType distsql.TiCIShardType,
 ) error {
 	if len(path.IdxCols) == 0 {
-		if !isTiCIIndex {
+		if ticiType == distsql.NotTiCIIndex {
 			path.TableFilters = conds
 		}
 		return nil
@@ -434,7 +442,10 @@ func detachCondAndBuildRangeForPath(
 		return err
 	}
 	path.Ranges = res.Ranges
-	if isTiCIIndex {
+	if ticiType != distsql.NotTiCIIndex {
+		if ticiType == distsql.TiCIShardIntHandle {
+			path.Ranges = fixTiCIIndexRangesForIntHandle(path.Ranges, path.IdxCols[0].RetType.GetFlag()&mysql.UnsignedFlag > 0)
+		}
 		return nil
 	}
 	path.AccessConds = res.AccessConds
@@ -451,6 +462,42 @@ func detachCondAndBuildRangeForPath(
 	}
 	path.CountAfterAccess, err = cardinality.GetRowCountByIndexRanges(sctx, histColl, path.Index.ID, path.Ranges, path.IdxCols)
 	return err
+}
+
+// fixTiCIIndexRangesForIntHandle fixes the TiCI index ranges for int handle.
+// For normal index range, its min value is NULL or the MinNotNull, and max value is MaxValue.
+// But for TiCI index range which directly uses table's int pk range, we should set the min value to the min int value and max value to max int value.
+// And unlike the normal index, the code converting the int pk's range to the final kv.KeyRange doesn't handle the NULL.
+// So after calling the function of extract normal index ranges, we need to fix the ranges for TiCI index with int handle.
+func fixTiCIIndexRangesForIntHandle(ranges []*ranger.Range, isUnsigned bool) []*ranger.Range {
+	var minDatum, maxDatum types.Datum
+	// isUnsigned indicates whether the handle is unsigned.
+	// Now we just cast the unsigned int to int and then store the int value inside the Datum.
+	// We wrap the uint64/int64 with Datum here to keep us untouched with Datum's internal representation.
+	if isUnsigned {
+		minDatum = types.NewUintDatum(0)
+		maxDatum = types.NewUintDatum(math.MaxUint64)
+	} else {
+		minDatum = types.NewIntDatum(math.MinInt64)
+		maxDatum = types.NewIntDatum(math.MaxInt64)
+	}
+	for i := len(ranges) - 1; i >= 0; i-- {
+		ran := ranges[i]
+		// Remove the [NULL, NULL] which is invalid when generating int handle's kv.KeyRange.
+		if ran.HighVal[0].IsNull() {
+			ranges = slices.Delete(ranges, i, i+1)
+			continue
+		}
+		// Convert the min and max value to the int min/max value.
+		if ran.LowVal[0].IsNull() || ran.LowVal[0].Kind() == types.KindMinNotNull {
+			ran.LowVal[0].SetInt64(minDatum.GetInt64())
+			ran.LowExclude = false
+		}
+		if ran.HighVal[0].Kind() == types.KindMaxValue {
+			ran.HighVal[0].SetInt64(maxDatum.GetInt64())
+		}
+	}
+	return ranges
 }
 
 func getGeneralAttributesFromPaths(paths []*util.AccessPath, totalRowCount float64) (float64, bool) {
