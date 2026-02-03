@@ -970,6 +970,7 @@ var funcs = map[string]functionClass{
 	// FTS functions.
 	ast.FTSMatchWord:   &ftsMatchWordFunctionClass{baseFunctionClass{ast.FTSMatchWord, 2, 2}},
 	ast.FTSMatchPrefix: &ftsMatchPrefixFunctionClass{baseFunctionClass{ast.FTSMatchPrefix, 2, -1}},
+	ast.FTSMatchPhrase: &ftsMatchPhraseFunctionClass{baseFunctionClass{ast.FTSMatchPhrase, 2, -1}},
 
 	// TiDB internal function.
 	ast.TiDBDecodeKey:       &tidbDecodeKeyFunctionClass{baseFunctionClass{ast.TiDBDecodeKey, 1, 1}},

@@ -369,6 +369,7 @@ const (
 	// FTS functions (TiDB extension).
 	FTSMatchWord   = "fts_match_word"
 	FTSMatchPrefix = "fts_match_prefix"
+	FTSMatchPhrase = "fts_match_phrase"
 
 	// TiDB internal function.
 	TiDBDecodeKey       = "tidb_decode_key"
