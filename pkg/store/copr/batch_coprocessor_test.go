@@ -24,6 +24,7 @@ import (
 
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
+	"github.com/pingcap/kvproto/pkg/coprocessor"
 	"github.com/pingcap/kvproto/pkg/metapb"
 	"github.com/pingcap/tidb/pkg/kv"
 	"github.com/pingcap/tidb/pkg/store/driver/backoff"
@@ -140,6 +141,18 @@ func TestBalanceBatchCopTaskWithEmptyTaskSet(t *testing.T) {
 		require.True(t, emptyResult != nil)
 		require.True(t, len(emptyResult) == 0)
 	}
+}
+
+func TestRetryBatchCopTaskForFullTextReturnsError(t *testing.T) {
+	it := &batchCopIterator{}
+	bo := backoff.NewBackofferWithVars(context.Background(), 1, nil)
+	task := &batchCopTask{
+		TableShardInfos: []*coprocessor.TableShardInfos{{}},
+	}
+	ret, err := it.retryBatchCopTask(context.Background(), bo, task)
+	require.Nil(t, ret)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "tiflash_fts node is unavailable")
 }
 
 func TestDeepCopyStoreTaskMap(t *testing.T) {
