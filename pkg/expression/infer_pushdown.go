@@ -423,7 +423,7 @@ func scalarExprSupportedByFlash(ctx EvalContext, function *ScalarFunction) bool 
 
 func scalarExprSupportedByTiCI(_ EvalContext, function *ScalarFunction) bool {
 	switch function.FuncName.L {
-	case ast.FTSMatchWord, ast.FTSMatchPrefix, ast.FTSMatchPhrase:
+	case ast.FTSMatchWord, ast.FTSMatchPrefix, ast.FTSMatchPhrase, ast.FTSMysqlMatchAgainst:
 		return true
 	default:
 		return false
