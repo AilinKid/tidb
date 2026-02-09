@@ -1610,6 +1610,23 @@ var defaultSysVars = []*SysVar{
 			return nil
 		},
 	},
+	{Scope: ScopeGlobal, Name: InnodbFtMaxTokenSize, Value: "84", Type: TypeUnsigned, MinValue: 10, MaxValue: 84},
+	{Scope: ScopeGlobal, Name: InnodbFtMinTokenSize, Value: "3", Type: TypeUnsigned, MinValue: 0, MaxValue: 16},
+	{Scope: ScopeGlobal, Name: NgramTokenSize, Value: "2", Type: TypeUnsigned, MinValue: 1, MaxValue: 10},
+	{Scope: ScopeGlobal, Name: InnodbFtServerStopwordTable, Value: "", Type: TypeStr, Validation: func(_ *SessionVars, normalizedValue string, originalValue string, _ ScopeFlag) (string, error) {
+		normalizedValue = strings.TrimSpace(normalizedValue)
+		if normalizedValue == "" {
+			return normalizedValue, nil
+		}
+		parts := strings.Split(normalizedValue, "/")
+		if len(parts) != 2 {
+			parts = strings.Split(normalizedValue, ".")
+		}
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return normalizedValue, ErrWrongValueForVar.GenWithStackByArgs(InnodbFtServerStopwordTable, originalValue)
+		}
+		return normalizedValue, nil
+	}},
 
 	/* The system variables below have GLOBAL and SESSION scope  */
 	{Scope: ScopeGlobal | ScopeSession, Name: TiDBEnablePlanReplayerContinuousCapture, Value: BoolToOnOff(false), Type: TypeBool,
@@ -1868,6 +1885,21 @@ var defaultSysVars = []*SysVar{
 		lockWaitSec := TidbOptInt64(val, DefInnodbLockWaitTimeout)
 		s.LockWaitTimeout = lockWaitSec * 1000
 		return nil
+	}},
+	{Scope: ScopeGlobal | ScopeSession, Name: InnodbFtEnableStopword, Value: On, Type: TypeBool, AutoConvertNegativeBool: true},
+	{Scope: ScopeGlobal | ScopeSession, Name: InnodbFtUserStopwordTable, Value: "", Type: TypeStr, Validation: func(_ *SessionVars, normalizedValue string, originalValue string, _ ScopeFlag) (string, error) {
+		normalizedValue = strings.TrimSpace(normalizedValue)
+		if normalizedValue == "" {
+			return normalizedValue, nil
+		}
+		parts := strings.Split(normalizedValue, "/")
+		if len(parts) != 2 {
+			parts = strings.Split(normalizedValue, ".")
+		}
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return normalizedValue, ErrWrongValueForVar.GenWithStackByArgs(InnodbFtUserStopwordTable, originalValue)
+		}
+		return normalizedValue, nil
 	}},
 	{
 		Scope:                   ScopeGlobal | ScopeSession,
@@ -3999,6 +4031,16 @@ const (
 	InnodbAdaptiveHashIndex = "innodb_adaptive_hash_index"
 	// InnodbFtEnableStopword is the name for 'innodb_ft_enable_stopword' system variable.
 	InnodbFtEnableStopword = "innodb_ft_enable_stopword" // #nosec G101
+	// InnodbFtMaxTokenSize is the name for 'innodb_ft_max_token_size' system variable.
+	InnodbFtMaxTokenSize = "innodb_ft_max_token_size" // #nosec G101
+	// InnodbFtMinTokenSize is the name for 'innodb_ft_min_token_size' system variable.
+	InnodbFtMinTokenSize = "innodb_ft_min_token_size" // #nosec G101
+	// NgramTokenSize is the name for 'ngram_token_size' system variable.
+	NgramTokenSize = "ngram_token_size" // #nosec G101
+	// InnodbFtServerStopwordTable is the name for 'innodb_ft_server_stopword_table' system variable.
+	InnodbFtServerStopwordTable = "innodb_ft_server_stopword_table" // #nosec G101
+	// InnodbFtUserStopwordTable is the name for 'innodb_ft_user_stopword_table' system variable.
+	InnodbFtUserStopwordTable = "innodb_ft_user_stopword_table" // #nosec G101
 	// InnodbSupportXA is the name for 'innodb_support_xa' system variable.
 	InnodbSupportXA = "innodb_support_xa"
 	// InnodbOptimizeFullTextOnly is the name for 'innodb_optimize_fulltext_only' system variable.
