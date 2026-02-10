@@ -29,6 +29,7 @@ import (
 	"github.com/pingcap/tidb/pkg/executor/importer"
 	"github.com/pingcap/tidb/pkg/infoschema"
 	"github.com/pingcap/tidb/pkg/kv"
+	metamodel "github.com/pingcap/tidb/pkg/meta/model"
 	"github.com/pingcap/tidb/pkg/parser/model"
 	"github.com/pingcap/tidb/pkg/testkit"
 	"github.com/pingcap/tidb/pkg/util/cdcutil"
@@ -194,4 +195,49 @@ func TestCheckRequirements(t *testing.T) {
 	require.NoError(t, backend.CreateBucket("test-bucket"))
 	c.Plan.CloudStorageURI = fmt.Sprintf("s3://test-bucket/path?region=us-east-1&endpoint=%s&access-key=xxxxxx&secret-access-key=xxxxxx", ts.URL)
 	require.NoError(t, c.CheckRequirements(ctx, conn))
+}
+
+func TestCheckRequirementsWithTiCIIndexLocalSort(t *testing.T) {
+	store := testkit.CreateMockStore(t)
+	tk := testkit.NewTestKit(t, store)
+	ctx := util.WithInternalSourceType(context.Background(), kv.InternalImportInto)
+	conn := tk.Session().GetSQLExecutor()
+
+	_, err := conn.Execute(ctx, "create table test.t(id int primary key)")
+	require.NoError(t, err)
+	is := tk.Session().GetDomainInfoSchema().(infoschema.InfoSchema)
+	tableObj, err := is.TableByName(context.Background(), model.NewCIStr("test"), model.NewCIStr("t"))
+	require.NoError(t, err)
+
+	tableInfo := tableObj.Meta().Clone()
+	tableInfo.Indices = append(tableInfo.Indices, &metamodel.IndexInfo{
+		ID:           1,
+		Name:         model.NewCIStr("tici_idx"),
+		FullTextInfo: &metamodel.FullTextIndexInfo{},
+	})
+
+	c := &importer.LoadDataController{
+		Plan: &importer.Plan{
+			DBName:          "test",
+			DataSourceType:  importer.DataSourceTypeFile,
+			TableInfo:       tableInfo,
+			TotalFileSize:   1,
+			DisablePrecheck: true,
+		},
+		Table: tableObj,
+	}
+
+	err = c.CheckRequirements(ctx, conn)
+	require.ErrorIs(t, err, exeerrors.ErrLoadDataPreCheckFailed)
+	require.ErrorContains(t, err, "local sort import does not support TiCI indexes")
+
+	c.Plan.ThreadCnt = 8
+	c.Plan.CloudStorageURI = ":"
+	err = c.CheckRequirements(ctx, conn)
+	require.ErrorIs(t, err, exeerrors.ErrLoadDataInvalidURI)
+
+	tableInfo.Indices = nil
+	c.Plan.CloudStorageURI = ""
+	err = c.CheckRequirements(ctx, conn)
+	require.NoError(t, err)
 }

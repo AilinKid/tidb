@@ -239,3 +239,37 @@ func TestModifyTaskParamLoop(t *testing.T) {
 		require.True(t, e.ctrl.Satisfied())
 	})
 }
+
+func TestBuildFullTextInfoWithCheckParser(t *testing.T) {
+	newIdxPart := func(name string) *ast.IndexPartSpecification {
+		return &ast.IndexPartSpecification{
+			Column: &ast.ColumnName{Name: pmodel.NewCIStr(name)},
+			Length: types.UnspecifiedLength,
+		}
+	}
+	tblInfo := &model.TableInfo{
+		Name: pmodel.NewCIStr("t"),
+		Columns: []*model.ColumnInfo{
+			{Name: pmodel.NewCIStr("c1"), Offset: 0, FieldType: *types.NewFieldType(mysql.TypeVarchar)},
+			{Name: pmodel.NewCIStr("c2"), Offset: 1, FieldType: *types.NewFieldType(mysql.TypeVarchar)},
+			{Name: pmodel.NewCIStr("c3"), Offset: 2, FieldType: *types.NewFieldType(mysql.TypeVarchar)},
+			{Name: pmodel.NewCIStr("c4"), Offset: 3, FieldType: *types.NewFieldType(mysql.TypeVarchar)},
+			{Name: pmodel.NewCIStr("c5"), Offset: 4, FieldType: *types.NewFieldType(mysql.TypeVarchar)},
+		},
+	}
+	idxParts := []*ast.IndexPartSpecification{
+		newIdxPart("c1"), newIdxPart("c2"), newIdxPart("c3"), newIdxPart("c4"), newIdxPart("c5"),
+	}
+
+	idx, err := buildFullTextIndexInfo(tblInfo, pmodel.NewCIStr("fts"), idxParts, nil, model.StateNone)
+	require.NoError(t, err)
+	require.Equal(t, model.FullTextParserTypeStandardV1, idx.FullTextInfo.ParserType)
+
+	idx, err = buildFullTextIndexInfo(tblInfo, pmodel.NewCIStr("fts"), idxParts, &ast.IndexOption{ParserName: pmodel.NewCIStr("standard")}, model.StateNone)
+	require.NoError(t, err)
+	require.Equal(t, model.FullTextParserTypeStandardV1, idx.FullTextInfo.ParserType)
+
+	idx, err = buildFullTextIndexInfo(tblInfo, pmodel.NewCIStr("fts"), idxParts, &ast.IndexOption{ParserName: pmodel.NewCIStr("ngram")}, model.StateNone)
+	require.NoError(t, err)
+	require.Equal(t, model.FullTextParserTypeNgramV1, idx.FullTextInfo.ParserType)
+}

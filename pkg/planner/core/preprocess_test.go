@@ -284,6 +284,16 @@ func TestValidator(t *testing.T) {
 		// LATERAL derived tables pass preprocessing; validation happens in the planner.
 		{"SELECT * FROM t, LATERAL (SELECT t.a) AS dt", false, nil},
 		{"SELECT * FROM t LEFT JOIN LATERAL (SELECT t.a) AS dt ON true", false, nil},
+
+		{"ALTER TABLE t ADD FULLTEXT INDEX (a) WITH PARSER multilingual", false, errors.New(`[ddl:8200]Unsupported parser 'multilingual'`)},
+		{"CREATE FULLTEXT INDEX ident ON d_n.t_n (ident) WITH PARSER multilingual", false, errors.New(`[ddl:8200]Unsupported parser 'multilingual'`)},
+		{"CREATE TABLE t(c TEXT, FULLTEXT INDEX (t) WITH PARSER multilingual)", false, errors.New(`[ddl:8200]Unsupported parser 'multilingual'`)},
+		{"CREATE FULLTEXT INDEX idx_name ON d_n.t_n (ident, ident2) WITH PARSER ngram", false, errors.New(`[schema:1146]Table 'd_n.t_n' doesn't exist`)},
+		{"CREATE FULLTEXT INDEX idx_name ON d_n.t_n (ident, ident2) WITH PARSER standard", false, errors.New(`[schema:1146]Table 'd_n.t_n' doesn't exist`)},
+		{"ALTER TABLE d_n.t_n ADD FULLTEXT INDEX idx_name (ident, ident2) WITH PARSER ngram", false, errors.New(`[schema:1146]Table 'd_n.t_n' doesn't exist`)},
+		{"ALTER TABLE d_n.t_n ADD FULLTEXT INDEX idx_name (ident, ident2) WITH PARSER standard", false, errors.New(`[schema:1146]Table 'd_n.t_n' doesn't exist`)},
+		{"CREATE TABLE t(c1 TEXT, c2 TEXT, c3 TEXT, c4 TEXT, c5 TEXT, FULLTEXT INDEX idx_name(c1,c2,c3,c4,c5) WITH PARSER ngram)", false, nil},
+		{"CREATE TABLE t(c1 TEXT, c2 TEXT, c3 TEXT, c4 TEXT, c5 TEXT, FULLTEXT INDEX idx_name(c1,c2,c3,c4,c5) WITH PARSER standard)", false, nil},
 	}
 
 	store := testkit.CreateMockStore(t)

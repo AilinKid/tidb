@@ -1168,8 +1168,9 @@ func TestLocalDoWriteTiCIPartialRange(t *testing.T) {
 	require.NotNil(t, job.writeResult)
 	require.Equal(t, []byte("c"), job.writeResult.remainingStartKey)
 	expectedLowerBound := codec.EncodeBytes([]byte{}, []byte("a"))
+	expectedUpperBound := codec.EncodeBytes([]byte{}, []byte("b"))
 	require.Equal(t, expectedLowerBound, ticiGroup.lastLowerBound)
-	require.Equal(t, []byte("b"), ticiGroup.lastUpperBound)
+	require.Equal(t, expectedUpperBound, ticiGroup.lastUpperBound)
 	require.Less(t, bytes.Compare(ticiGroup.lastUpperBound, job.writeResult.remainingStartKey), 0)
 }
 

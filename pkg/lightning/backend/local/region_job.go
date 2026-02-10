@@ -515,7 +515,7 @@ func (local *Backend) doWrite(ctx context.Context, j *regionJob) (err error) {
 		}
 		upperBound := lastKey
 		if lastWrittenKey != nil {
-			upperBound = lastWrittenKey
+			upperBound = codec.EncodeBytes([]byte{}, lastWrittenKey)
 		}
 		if err := local.ticiWriteGroup.FinishPartitionUpload(ctx, fileWriter, firstKey, upperBound); err != nil {
 			return errors.Annotate(err, "failed to finish upload for tici file writer")

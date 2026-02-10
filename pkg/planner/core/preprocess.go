@@ -971,10 +971,10 @@ func (p *preprocessor) checkCreateTableGrammar(stmt *ast.CreateTableStmt) {
 				p.err = dbterror.ErrWrongNameForIndex.GenWithStackByArgs(constraint.Name)
 				return
 			}
-			if constraint.Tp == ast.ConstraintFulltext && constraint.Option != nil && constraint.Option.ParserName.L != "" &&
-				model.GetFullTextParserTypeBySQLName(constraint.Option.ParserName.L) == model.FullTextParserTypeInvalid {
-				p.err = dbterror.ErrUnsupportedIndexType.FastGen("Unsupported parser '%s'", constraint.Option.ParserName.O)
-				return
+			if constraint.Tp == ast.ConstraintFulltext && constraint.Option != nil && constraint.Option.ParserName.L != "" {
+				if p.err = validateFullTextParserName(constraint.Option.ParserName); p.err != nil {
+					return
+				}
 			}
 		case ast.ConstraintPrimaryKey:
 			if countPrimaryKey > 0 {
@@ -1195,7 +1195,7 @@ func (p *preprocessor) checkCreateIndexGrammar(stmt *ast.CreateIndexStmt) {
 		return
 	}
 	if stmt.IndexOption != nil {
-		if stmt.IndexOption.TiCIParameter != "" && stmt.KeyType != ast.IndexKeyTypeFullText && stmt.KeyType != ast.IndexKeyTypeHybrid {
+		if stmt.IndexOption.TiCIParameter != "" && stmt.KeyType != ast.IndexKeyTypeFullText && stmt.KeyType != ast.IndexKeyTypeHybrid && stmt.IndexOption.Tp != pmodel.IndexTypeHybrid {
 			p.err = dbterror.ErrUnsupportedIndexType.FastGen("PARAMETER is only supported for FULLTEXT/HYBRID INDEX")
 			return
 		}
@@ -1204,12 +1204,20 @@ func (p *preprocessor) checkCreateIndexGrammar(stmt *ast.CreateIndexStmt) {
 			return
 		}
 	}
-	if stmt.KeyType == ast.IndexKeyTypeFullText && stmt.IndexOption != nil && stmt.IndexOption.ParserName.L != "" &&
-		model.GetFullTextParserTypeBySQLName(stmt.IndexOption.ParserName.L) == model.FullTextParserTypeInvalid {
-		p.err = dbterror.ErrUnsupportedIndexType.FastGen("Unsupported parser '%s'", stmt.IndexOption.ParserName.O)
-		return
+	if stmt.KeyType == ast.IndexKeyTypeFullText && stmt.IndexOption != nil && stmt.IndexOption.ParserName.L != "" {
+		if p.err = validateFullTextParserName(stmt.IndexOption.ParserName); p.err != nil {
+			return
+		}
 	}
 	p.err = checkIndexInfo(stmt.IndexName, stmt.IndexPartSpecifications)
+}
+
+func validateFullTextParserName(parserName pmodel.CIStr) error {
+	parserType := model.GetFullTextParserTypeBySQLName(parserName.L)
+	if parserType != model.FullTextParserTypeStandardV1 && parserType != model.FullTextParserTypeNgramV1 {
+		return dbterror.ErrUnsupportedIndexType.FastGen("Unsupported parser '%s'", parserName.O)
+	}
+	return nil
 }
 
 func (p *preprocessor) checkSelectNoopFuncs(stmt *ast.SelectStmt) {
@@ -1334,10 +1342,10 @@ func (p *preprocessor) checkAlterTableGrammar(stmt *ast.AlterTableStmt) {
 				if p.err != nil {
 					return
 				}
-				if spec.Constraint.Tp == ast.ConstraintFulltext && spec.Constraint.Option != nil && spec.Constraint.Option.ParserName.L != "" &&
-					model.GetFullTextParserTypeBySQLName(spec.Constraint.Option.ParserName.L) == model.FullTextParserTypeInvalid {
-					p.err = dbterror.ErrUnsupportedIndexType.FastGen("Unsupported parser '%s'", spec.Constraint.Option.ParserName.O)
-					return
+				if spec.Constraint.Tp == ast.ConstraintFulltext && spec.Constraint.Option != nil && spec.Constraint.Option.ParserName.L != "" {
+					if p.err = validateFullTextParserName(spec.Constraint.Option.ParserName); p.err != nil {
+						return
+					}
 				}
 				if spec.Constraint.Option != nil {
 					if spec.Constraint.Option.TiCIParameter != "" && spec.Constraint.Tp != ast.ConstraintFulltext && spec.Constraint.Tp != ast.ConstraintHybrid {
