@@ -822,6 +822,17 @@ func (ds *DataSource) CheckPartialIndexByFilters(index *model.IndexInfo, filters
 // The v8.5 planner PredicatePushDown interface cannot return an error. The FTS
 // validation rule invokes this method immediately after predicate pushdown.
 func (ds *DataSource) AnalyzeTiCIIndex(hasFTSFunc bool) error {
+	hasDirtyWrite := ds.SCtx().HasDirtyContent(ds.TableInfo.ID)
+	if !hasFTSFunc && hasDirtyWrite {
+		// If there is no FTS function, and there're dirty writes on the table,
+		// we should not use any TiCI index.
+		// Because the TiCI index may be not consistent with the table data.
+		// These TiCI indexes will be removed by CleanUnusedTiCIIndexes later.
+		return nil
+	}
+	if hasFTSFunc && hasDirtyWrite {
+		return errors.Errorf("Fulltext search currently can not be used in transaction with uncommitted data")
+	}
 	// Predicate pushdown performs the conversion before statistics derivation.
 	// The following validation rule calls this method again to surface errors;
 	// keep the successful conversion idempotent.
