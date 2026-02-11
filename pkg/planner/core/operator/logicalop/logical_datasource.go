@@ -936,6 +936,7 @@ func (ds *DataSource) buildTiCIFTSPathAndCleanUp(
 	index *model.IndexInfo,
 	matchedFuncs map[*expression.ScalarFunction]struct{},
 ) error {
+	ds.SCtx().GetSessionVars().StmtCtx.SetSkipPlanCache("TiCI Index currently can not be cached")
 	// Fulltext index must be used, so prune all other access paths.
 	ds.PossibleAccessPaths = slices.DeleteFunc(ds.PossibleAccessPaths, func(path *util.AccessPath) bool {
 		return path.Index == nil || path.Index.ID != index.ID

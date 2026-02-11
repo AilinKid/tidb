@@ -90,8 +90,8 @@ func (c *ftsMatchWordFunctionClass) getFunction(ctx BuildContext, args []Express
 	if !ok {
 		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-constant string")
 	}
-	if argAgainstConstant.Value.Kind() != types.KindString {
-		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-constant string")
+	if argAgainstConstant.Value.Kind() != types.KindString && !argAgainstConstant.Value.IsNull() {
+		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-string constant")
 	}
 	for _, arg := range args[1:] {
 		if _, ok := arg.(*Column); !ok {
@@ -116,12 +116,20 @@ func (c *ftsMatchWordFunctionClass) getFunction(ctx BuildContext, args []Express
 }
 
 func (b *builtinFtsMatchWordSig) evalReal(ctx EvalContext, row chunk.Row) (float64, bool, error) {
-	// Reject executing match against in TiDB side.
+	// Matching NULL returns 0.
+	if b.args[0].(*Constant).Value.IsNull() {
+		return 0, false, nil
+	}
+	// Reject executing match against in TiDB side
 	return 0, false, errors.Errorf("cannot use 'FTS_MATCH_WORD()' outside of fulltext index")
 }
 
 func (b *builtinFtsMatchPhraseSig) evalReal(ctx EvalContext, row chunk.Row) (float64, bool, error) {
-	// Reject executing match against in TiDB side.
+	// Matching NULL returns 0.
+	if b.args[0].(*Constant).Value.IsNull() {
+		return 0, false, nil
+	}
+	// Reject executing match against in TiDB side
 	return 0, false, errors.Errorf("cannot use 'FTS_MATCH_PHRASE()' outside of fulltext index")
 }
 
@@ -150,8 +158,8 @@ func (c *ftsMysqlMatchAgainstFunctionClass) getFunction(ctx BuildContext, args [
 	if !ok {
 		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-constant string")
 	}
-	if argAgainstConstant.Value.Kind() != types.KindString {
-		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-constant string")
+	if argAgainstConstant.Value.Kind() != types.KindString && !argAgainstConstant.Value.IsNull() {
+		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-string constant")
 	}
 
 	argsMatch := args[1:]
@@ -179,7 +187,11 @@ func (c *ftsMysqlMatchAgainstFunctionClass) getFunction(ctx BuildContext, args [
 }
 
 func (b *builtinFtsMysqlMatchAgainstSig) evalReal(ctx EvalContext, row chunk.Row) (float64, bool, error) {
-	// Reject executing match against in TiDB side.
+	// Matching NULL returns 0.
+	if b.args[0].(*Constant).Value.IsNull() {
+		return 0, false, nil
+	}
+	// Reject executing match against in TiDB side
 	return 0, false, errors.Errorf("cannot use 'MATCH ... AGAINST' outside of fulltext index")
 }
 
@@ -207,8 +219,8 @@ func (c *ftsMatchPrefixFunctionClass) getFunction(ctx BuildContext, args []Expre
 	if !ok {
 		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-constant string")
 	}
-	if argAgainstConstant.Value.Kind() != types.KindString {
-		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-constant string")
+	if argAgainstConstant.Value.Kind() != types.KindString && !argAgainstConstant.Value.IsNull() {
+		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-string constant")
 	}
 	argsMatch := args[1:]
 	for _, arg := range argsMatch {
@@ -234,6 +246,10 @@ func (c *ftsMatchPrefixFunctionClass) getFunction(ctx BuildContext, args []Expre
 }
 
 func (b *builtinFtsMatchPrefixSig) evalReal(ctx EvalContext, row chunk.Row) (float64, bool, error) {
+	// Matching NULL returns 0.
+	if b.args[0].(*Constant).Value.IsNull() {
+		return 0, false, nil
+	}
 	// Reject executing match against in TiDB side.
 	return 0, false, errors.Errorf("cannot use 'FTS_MATCH_PREFIX()' outside of fulltext index")
 }
@@ -248,8 +264,8 @@ func (c *ftsMatchPhraseFunctionClass) getFunction(ctx BuildContext, args []Expre
 	if !ok {
 		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-constant string")
 	}
-	if argAgainstConstant.Value.Kind() != types.KindString {
-		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-constant string")
+	if argAgainstConstant.Value.Kind() != types.KindString && !argAgainstConstant.Value.IsNull() {
+		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-string constant")
 	}
 	argsMatch := args[1:]
 	for _, arg := range argsMatch {
