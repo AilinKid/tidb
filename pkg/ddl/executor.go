@@ -4806,11 +4806,19 @@ func (e *executor) createFullTextIndex(ctx sessionctx.Context, ti ast.Ident, ind
 	job := buildAddIndexJobWithoutTypeAndArgs(ctx, schema, t)
 	job.Version = model.GetJobVerInUse()
 	job.Type = model.ActionAddFullTextIndex
+	job.AddSessionVars(variable.TiDBEnableStatsUpdateDuringDDL, getEnableDDLAnalyze(ctx))
+	job.AddSessionVars(variable.TiDBAnalyzeVersion, getAnalyzeVersion(ctx))
+	// indexPartSpecifications[i].Expr can not be unmarshaled, so we set them to nil.
 	for _, spec := range indexPartSpecifications {
 		spec.Expr = nil
 	}
 
 	if err := e.captureFullTextIndexSysvarsToJob(ctx, job, indexOption); err != nil {
+		return errors.Trace(err)
+	}
+
+	err = initJobReorgMetaFromVariables(job, ctx)
+	if err != nil {
 		return errors.Trace(err)
 	}
 
@@ -5369,7 +5377,7 @@ func initJobReorgMetaFromVariables(job *model.Job, sctx sessionctx.Context) erro
 	}
 
 	switch job.Type {
-	case model.ActionAddIndex, model.ActionAddPrimaryKey, model.ActionAddHybridIndex:
+	case model.ActionAddIndex, model.ActionAddPrimaryKey, model.ActionAddHybridIndex, model.ActionAddFullTextIndex:
 		setReorgParam()
 		err := setDistTaskParam()
 		if err != nil {
