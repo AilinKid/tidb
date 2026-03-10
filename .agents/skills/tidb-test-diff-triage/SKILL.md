@@ -27,15 +27,23 @@ test -f pkg/<package_name>/BUILD.bazel && \
 
 2. If any hit exists, rerun with failpoint enable/disable wrapper:
 ```bash
-make failpoint-enable && (
-  go test ./pkg/<package_name> \
-    -run '<TestName>' \
-    -tags=intest,deadlock \
-    -count=1
-  rc=$?
+make failpoint-enable
+rc=0
+cleanup() {
+  trap - EXIT INT TERM
   make failpoint-disable
-  exit $rc
-)
+  cleanup_rc=$?
+  if [ "$cleanup_rc" -ne 0 ]; then
+    echo "make failpoint-disable failed: ${cleanup_rc}" >&2
+    exit "$cleanup_rc"
+  fi
+  exit "$rc"
+}
+trap cleanup EXIT INT TERM
+go test ./pkg/<package_name> \
+  -run '<TestName>' \
+  -tags=intest,deadlock \
+  -count=1 || rc=$?
 ```
 
 3. If diff disappears after failpoint enable, classify as environment/setup issue, not logic regression.
@@ -53,6 +61,8 @@ Useful commands:
 git bisect start
 git bisect bad <bad_commit>
 git bisect good <good_commit>
+# after bisect completes (or when stopping early), return to original branch
+git bisect reset
 ```
 
 ## Rule 3: update testdata only after cause is proven
