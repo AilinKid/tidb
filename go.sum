@@ -723,8 +723,6 @@ github.com/AilinKid/tipb v0.0.0-20260903024624-c8b140052244 h1:TTE/oUlMM6S5eBjxg
 github.com/AilinKid/tipb v0.0.0-20260903024624-c8b140052244/go.mod h1:A7mrd7WHBl1o63LE2bIBGEJMTNWXqhgmYiOvMLxozfs=
 github.com/AilinKid/tipb v0.0.0-20260903035542-cc991284c165 h1:PYvyr3d0Lx98vvonxoBylfjbDqm6MTixWIQ9eJcg+GI=
 github.com/AilinKid/tipb v0.0.0-20260903035542-cc991284c165/go.mod h1:A7mrd7WHBl1o63LE2bIBGEJMTNWXqhgmYiOvMLxozfs=
-github.com/AilinKid/tipb v0.0.0-20260903085709-4768c71070e4 h1:ghimpcCgHtoIx/SXR73qXOR/V6Pq+LUnHVv8tGcht/g=
-github.com/AilinKid/tipb v0.0.0-20260903085709-4768c71070e4/go.mod h1:A7mrd7WHBl1o63LE2bIBGEJMTNWXqhgmYiOvMLxozfs=
 github.com/pingcap/tipb v0.0.0-20260605083900-f9f651ef5fbc h1:wxolKysltFSu8gxWJBdUdWuTBoSuY3MjNIIZI5S9JLY=
 github.com/pingcap/tipb v0.0.0-20260605083900-f9f651ef5fbc/go.mod h1:A7mrd7WHBl1o63LE2bIBGEJMTNWXqhgmYiOvMLxozfs=
 github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c h1:+mdjkGKdHQG3305AYmdv1U2eRNDiU2ErMBj1gwrq8eQ=

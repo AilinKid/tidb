@@ -21,15 +21,9 @@ import (
 	"github.com/pingcap/tipb/go-tipb"
 )
 
-var (
-	_ functionClass = &ftsMatchWordFunctionClass{}
-	_ functionClass = &ftsMatchPhraseFunctionClass{}
-)
+var _ functionClass = &ftsMatchWordFunctionClass{}
 
-var (
-	_ builtinFunc = &builtinFtsMatchWordSig{}
-	_ builtinFunc = &builtinFtsMatchPhraseSig{}
-)
+var _ builtinFunc = &builtinFtsMatchWordSig{}
 
 type ftsMatchWordFunctionClass struct {
 	baseFunctionClass
@@ -39,22 +33,8 @@ type builtinFtsMatchWordSig struct {
 	baseBuiltinFunc
 }
 
-type ftsMatchPhraseFunctionClass struct {
-	baseFunctionClass
-}
-
-type builtinFtsMatchPhraseSig struct {
-	baseBuiltinFunc
-}
-
 func (b *builtinFtsMatchWordSig) Clone() builtinFunc {
 	newSig := &builtinFtsMatchWordSig{}
-	newSig.cloneFrom(&b.baseBuiltinFunc)
-	return newSig
-}
-
-func (b *builtinFtsMatchPhraseSig) Clone() builtinFunc {
-	newSig := &builtinFtsMatchPhraseSig{}
 	newSig.cloneFrom(&b.baseBuiltinFunc)
 	return newSig
 }
@@ -92,11 +72,6 @@ func (c *ftsMatchWordFunctionClass) getFunction(ctx BuildContext, args []Express
 func (b *builtinFtsMatchWordSig) evalReal(ctx EvalContext, row chunk.Row) (float64, bool, error) {
 	// Reject executing match against in TiDB side.
 	return 0, false, errors.Errorf("cannot use 'FTS_MATCH_WORD()' outside of fulltext index")
-}
-
-func (b *builtinFtsMatchPhraseSig) evalReal(ctx EvalContext, row chunk.Row) (float64, bool, error) {
-	// Reject executing match against in TiDB side.
-	return 0, false, errors.Errorf("cannot use 'FTS_MATCH_PHRASE()' outside of fulltext index")
 }
 
 type ftsMatchPrefixFunctionClass struct {
@@ -152,39 +127,4 @@ func (c *ftsMatchPrefixFunctionClass) getFunction(ctx BuildContext, args []Expre
 func (b *builtinFtsMatchPrefixSig) evalReal(ctx EvalContext, row chunk.Row) (float64, bool, error) {
 	// Reject executing match against in TiDB side.
 	return 0, false, errors.Errorf("cannot use 'FTS_MATCH_PREFIX()' outside of fulltext index")
-}
-
-func (c *ftsMatchPhraseFunctionClass) getFunction(ctx BuildContext, args []Expression) (builtinFunc, error) {
-	if err := c.verifyArgs(args); err != nil {
-		return nil, err
-	}
-
-	argAgainst := args[0]
-	argAgainstConstant, ok := argAgainst.(*Constant)
-	if !ok {
-		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-constant string")
-	}
-	if argAgainstConstant.Value.Kind() != types.KindString {
-		return nil, ErrNotSupportedYet.GenWithStackByArgs("match against a non-constant string")
-	}
-	argsMatch := args[1:]
-	for _, arg := range argsMatch {
-		if _, ok := arg.(*Column); !ok {
-			return nil, ErrNotSupportedYet.GenWithStackByArgs("not matching a column")
-		}
-	}
-
-	argTps := make([]types.EvalType, len(args))
-	for i := range argTps {
-		argTps[i] = types.ETString
-	}
-
-	bf, err := newBaseBuiltinFuncWithTp(ctx, c.funcName, args, types.ETReal, argTps...)
-	if err != nil {
-		return nil, err
-	}
-
-	sig := &builtinFtsMatchPhraseSig{bf}
-	sig.setPbCode(tipb.ScalarFuncSig_FTSMatchPhrase)
-	return sig, nil
 }
