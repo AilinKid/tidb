@@ -29,8 +29,11 @@ import (
 
 func TestTiCISearchExplain(t *testing.T) {
 	require.NoError(t, failpoint.Enable("github.com/pingcap/tidb/pkg/domain/infosync/MockCreateTiCIndexSuccess", `return(true)`))
+	require.NoError(t, failpoint.Enable("github.com/pingcap/tidb/pkg/tici/MockCreateTiCIIndexSuccess", `return(true)`))
 	defer func() {
 		err := failpoint.Disable("github.com/pingcap/tidb/pkg/domain/infosync/MockCreateTiCIndexSuccess")
+		require.NoError(t, err)
+		err = failpoint.Disable("github.com/pingcap/tidb/pkg/tici/MockCreateTiCIIndexSuccess")
 		require.NoError(t, err)
 	}()
 
@@ -54,7 +57,7 @@ func TestTiCISearchExplain(t *testing.T) {
 	)`)
 	dom := domain.GetDomain(tk.Session())
 	testkit.SetTiFlashReplica(t, dom, "test", "t1")
-	tk.MustExec("create table t2(col text)")
+	tk.MustExec("create table t2(a int, col text)")
 
 	tk.MustExec(`create table t3(
 		a int,
@@ -63,6 +66,17 @@ func TestTiCISearchExplain(t *testing.T) {
 		primary key(a, b),
 		fulltext key(title)
 	)`)
+
+	tk.MustExec("create table t4(i bigint, ts timestamp(5), d datetime(3), t varchar(255), primary key(i))")
+	tk.MustExec(`create hybrid index idx1 on t4(i, ts, d, t) parameter '{
+		"inverted": {
+			"columns": ["i", "ts", "d", "t"]
+		},
+		"sort": {
+			"columns": ["i", "ts", "d"],
+			"order": ["asc", "desc", "asc"]
+		}
+	}'`)
 
 	var input []string
 	var output []struct {
@@ -108,6 +122,16 @@ func TestTiCIWithIndexHintCases(t *testing.T) {
 		FULLTEXT INDEX idx_title (title),
 		index idx_field1 (field1)
 	)`)
+	tk.MustExec("create table t2(i bigint, ts timestamp(5), d datetime(3), t varchar(255), primary key(i))")
+	tk.MustExec(`create hybrid index idx1 on t2(i, ts, d, t) parameter '{
+		"inverted": {
+			"columns": ["i", "ts", "d", "t"]
+		},
+		"sort": {
+			"columns": ["i", "ts", "d"],
+			"order": ["asc", "desc", "asc"]
+		}
+	}'`)
 	dom := domain.GetDomain(tk.Session())
 	testkit.SetTiFlashReplica(t, dom, "test", "t1")
 

@@ -463,7 +463,7 @@ func (path *AccessPath) IsUndetermined() bool {
 	if path.IsTablePath() || path.Index == nil {
 		return false
 	}
-	if path.Index.MVIndex || path.Index.HasCondition() || path.Index.FullTextInfo != nil {
+	if path.Index.MVIndex || path.Index.HasCondition() || path.Index.IsTiCIIndex() {
 		return true
 	}
 	return false

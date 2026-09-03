@@ -88,7 +88,7 @@ func (f *ftsFuncValidation) doQuickValidation(ctx context.Context, p base.Logica
 			return plannererrors.ErrWrongUsage.FastGen("Currently 'FTS_MATCH_WORD()' cannot be used in GROUP BY or HAVING")
 		}
 	case *logicalop.DataSource:
-		if err := x.AnalyzeFTSFunc(); err != nil {
+		if err := x.AnalyzeTiCIIndex(true); err != nil {
 			return err
 		}
 	case *logicalop.LogicalCTE:

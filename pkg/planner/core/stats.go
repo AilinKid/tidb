@@ -182,7 +182,7 @@ func fillIndexPath(ds *logicalop.DataSource, path *util.AccessPath, conds []expr
 	path.CountAfterAccess = float64(ds.StatisticTable.RealtimeCount)
 	path.IdxCols, path.IdxColLens, path.FullIdxCols, path.FullIdxColLens =
 		util.IndexInfo2Cols(ds.Columns, ds.Schema().Columns, path.Index)
-	if path.Index.FullTextInfo != nil {
+	if path.Index.IsTiCIIndex() {
 		path.TableFilters = slices.Clone(conds)
 		return nil
 	}

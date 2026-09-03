@@ -84,7 +84,7 @@ func (t *CopTask) finishIndexPlan() {
 
 func (t *CopTask) getStoreType() kv.StoreType {
 	p := t.indexPlan
-	if t.tablePlan != nil {
+	if t.tablePlan != nil && (t.indexPlanFinished || p == nil) {
 		p = t.tablePlan
 	}
 	if p == nil {
@@ -659,7 +659,7 @@ func (p *PhysicalLimit) Attach2Task(tasks ...base.Task) base.Task {
 		if len(cop.idxMergePartPlans) == 0 {
 			// For double read which requires order being kept, the limit cannot be pushed down to the table side,
 			// because handles would be reordered before being sent to table scan.
-			if (!cop.keepOrder || !cop.indexPlanFinished || cop.indexPlan == nil) && len(cop.rootTaskConds) == 0 && cop.getStoreType() != kv.TiCI {
+			if (!cop.keepOrder || !cop.indexPlanFinished || cop.indexPlan == nil) && len(cop.rootTaskConds) == 0 {
 				// When limit is pushed down, we should remove its offset.
 				newCount := p.Offset + p.Count
 				childProfile := cop.Plan().StatsInfo()
@@ -948,9 +948,9 @@ func (p *PhysicalTopN) containVirtualColumn(tCols []*expression.Column) bool {
 	return false
 }
 
-// canPushDownToTiKV checks whether this topN can be pushed down to TiKV.
-func (p *PhysicalTopN) canPushDownToTiKV(copTask *CopTask) bool {
-	if !p.canExpressionConvertedToPB(kv.TiKV) {
+// canPushDownByCopType checks whether this TopN can be pushed down to the coprocessor store.
+func (p *PhysicalTopN) canPushDownByCopType(copTask *CopTask, storeType kv.StoreType) bool {
+	if !p.canExpressionConvertedToPB(storeType) {
 		return false
 	}
 	if len(copTask.rootTaskConds) != 0 {
@@ -1066,7 +1066,7 @@ func (p *PhysicalTopN) Attach2Task(tasks ...base.Task) base.Task {
 			return newTask
 		}
 	}
-	if copTask, ok := t.(*CopTask); ok && needPushDown && p.canPushDownToTiKV(copTask) && len(copTask.rootTaskConds) == 0 {
+	if copTask, ok := t.(*CopTask); ok && needPushDown && p.canPushDownByCopType(copTask, copTask.getStoreType()) && len(copTask.rootTaskConds) == 0 {
 		// Handle IndexMerge with advisory sort items when some (but not all)
 		// partial paths satisfy the sort order. When all paths satisfy, the
 		// existing Limit pushdown via attach2Task4PhysicalLimit gives a better plan.
@@ -1089,8 +1089,26 @@ func (p *PhysicalTopN) Attach2Task(tasks ...base.Task) base.Task {
 		var pushedDownTopN *PhysicalTopN
 		if !copTask.indexPlanFinished && p.canPushToIndexPlan(copTask.indexPlan, cols) {
 			pushedDownTopN = p.getPushedDownTopN(copTask.indexPlan)
+			indexScanPlan := copTask.indexPlan
+			for len(indexScanPlan.Children()) > 0 {
+				indexScanPlan = indexScanPlan.Children()[0]
+			}
+			indexScan := indexScanPlan.(*PhysicalIndexScan)
+			if indexScan.StoreType == kv.TiCI {
+				indexScan.TryToPassTiCITopN(pushedDownTopN)
+			}
 			copTask.indexPlan = pushedDownTopN
 		} else {
+			if !copTask.indexPlanFinished && copTask.indexPlan != nil {
+				indexScanPlan := copTask.indexPlan
+				for len(indexScanPlan.Children()) > 0 {
+					indexScanPlan = indexScanPlan.Children()[0]
+				}
+				indexScan := indexScanPlan.(*PhysicalIndexScan)
+				if indexScan.StoreType == kv.TiCI {
+					indexScan.TryToPassTiCITopN(p.getPushedDownTopN(copTask.indexPlan))
+				}
+			}
 			// It works for both normal index scan and index merge scan.
 			copTask.finishIndexPlan()
 			pushedDownTopN = p.getPushedDownTopN(copTask.tablePlan)

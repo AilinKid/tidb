@@ -861,6 +861,44 @@ type PhysicalIndexScan struct {
 	FtsQueryInfo *tipb.FTSQueryInfo `plan-cache-clone:"must-nil"`
 }
 
+// TryToPassTiCITopN checks whether the TopN can be embedded into a TiCI index scan.
+func (p *PhysicalIndexScan) TryToPassTiCITopN(topN *PhysicalTopN) {
+	hybridSearchInfo := p.Index.HybridInfo
+	if hybridSearchInfo == nil || hybridSearchInfo.Sort == nil {
+		return
+	}
+
+	orderMatched := true
+	orderPos := 0
+checkLoop:
+	for _, byItem := range topN.ByItems {
+		if orderPos >= len(hybridSearchInfo.Sort.Columns) || !orderMatched {
+			break
+		}
+		switch x := byItem.Expr.(type) {
+		case *expression.Column:
+			if byItem.Desc != !hybridSearchInfo.Sort.IsAsc[orderPos] {
+				orderMatched = false
+				break checkLoop
+			}
+			colID := p.Table.Columns[hybridSearchInfo.Sort.Columns[orderPos].Offset].ID
+			if colID != x.ID {
+				orderMatched = false
+				break checkLoop
+			}
+			orderPos++
+		case *expression.ScalarFunction:
+			orderMatched = false
+			break checkLoop
+		}
+	}
+	if orderMatched {
+		p.FtsQueryInfo.TopK = new(uint32)
+		// The passed TopN here may be the global one. We need to consider the offset.
+		*p.FtsQueryInfo.TopK = uint32(topN.Count) + uint32(topN.Offset)
+	}
+}
+
 // Clone implements op.PhysicalPlan interface.
 func (p *PhysicalIndexScan) Clone(newCtx base.PlanContext) (base.PhysicalPlan, error) {
 	cloned := new(PhysicalIndexScan)
